@@ -1,0 +1,98 @@
+# ===================
+# Python
+# ===================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ===================
+# Virtual Environment
+# ===================
+venv/
+env/
+ENV/
+.venv/
+
+# ===================
+# Environment Variables
+# ===================
+.env
+.env.local
+.env.*.local
+
+# ===================
+# IDE / Editor
+# ===================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ===================
+# OS Files
+# ===================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ===================
+# Logs
+# ===================
+*.log
+logs/
+npm-debug.log*
+
+# ===================
+# Testing
+# ===================
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+
+# ===================
+# State Files
+# ===================
+api_key_tracker.json
+
+# ===================
+# Large Data/Model Files (keep in repo for deployment)
+# Uncomment if you want to exclude these
+# ===================
+# *.pkl
+# chroma_db/
+# processed_legal_data.json
+# bm25_index.pkl
+# chunk_ids.json
+
+# ===================
+# Backup Files
+# ===================
+*_old*.py
+*.bak
+*.backup
