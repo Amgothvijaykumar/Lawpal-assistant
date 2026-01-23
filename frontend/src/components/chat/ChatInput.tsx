@@ -85,19 +85,19 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 pb-6 pt-4">
-      <div className="w-full max-w-4xl mx-auto px-4 md:px-8">
-        <div className="relative flex items-end gap-2 bg-slate-100 dark:bg-slate-800/50 rounded-3xl p-2 border border-slate-200 dark:border-slate-700/50 focus-within:border-indigo-400/50 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900/30 transition-all shadow-sm">
-          {/* Attach Document Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
-                disabled={disabled}
-              >
-                <Paperclip className="w-4 h-4" />
+    <div className="w-full max-w-3xl mx-auto px-4 md:px-6 pb-4 pt-2 bg-gradient-to-t from-[#F9FAFB] via-[#F9FAFB] to-transparent dark:from-slate-900 dark:via-slate-900">
+      {/* Input Box */}
+      <div className="relative flex items-end gap-2 bg-white dark:bg-slate-900 rounded-2xl p-2 border border-slate-200 dark:border-slate-700/50 focus-within:border-indigo-400/50 focus-within:ring-2 focus-within:ring-indigo-100 dark:focus-within:ring-indigo-900/30 transition-all shadow-lg">
+        {/* Attach Document Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full shrink-0 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50"
+              disabled={disabled}
+            >
+              <Paperclip className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Attach document</TooltipContent>
@@ -151,11 +151,11 @@ export function ChatInput({
               )}
             </Button>
           )}
-        </div>
-        <p className="text-xs text-slate-400 text-center mt-3">
-          ACTRIGHT provides legal information, not legal advice. Consult a licensed lawyer for specific legal matters.
-        </p>
       </div>
+      {/* Disclaimer */}
+      <p className="text-[11px] text-slate-400 text-center mt-2">
+        ACTRIGHT provides legal information, not legal advice. Consult a licensed lawyer for specific legal matters.
+      </p>
     </div>
   );
 }

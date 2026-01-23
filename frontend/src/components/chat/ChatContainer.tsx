@@ -128,10 +128,10 @@ export function ChatContainer({
   }, [loading, messages.length, scrollToBottom]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-[#F9FAFB] dark:bg-slate-900 relative">
+    <div className="flex-1 flex flex-col min-h-0 bg-[#F9FAFB] dark:bg-slate-900">
 
       {/* Messages Area */}
-      <div className="flex-1 flex flex-col min-h-0 relative">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         {loading && messages.length === 0 ? (
           <ChatSkeleton />
         ) : !hasSession && messages.length === 0 ? (
@@ -160,7 +160,7 @@ export function ChatContainer({
 
                 {/* Suggestions removed */}
 
-                {/* Invisible spacer for scrolling */}
+                {/* Bottom padding for comfortable reading */}
                 <div className="h-8" />
               </div>
             </div>
@@ -169,7 +169,7 @@ export function ChatContainer({
             <button
               onClick={() => scrollToBottom('smooth')}
               className={cn(
-                'absolute bottom-24 right-6 z-20',
+                'absolute bottom-4 right-6 z-20',
                 'w-10 h-10 rounded-full',
                 'bg-white dark:bg-slate-800 shadow-xl border border-slate-100 dark:border-slate-700',
                 'flex items-center justify-center',
@@ -185,13 +185,16 @@ export function ChatContainer({
             </button>
           </>
         )}
+      </div>
 
+      {/* Chat Input - Fixed at bottom */}
+      <div className="shrink-0 border-t border-slate-200/50 dark:border-slate-700/50">
         <ChatInput
-          onSend={hasSession ? onSendMessage : onStartNewChat}
-          disabled={loading || streaming}
-          isStreaming={streaming}
-          placeholder="Ask anything..."
-        />
+        onSend={hasSession ? onSendMessage : onStartNewChat}
+        disabled={loading || streaming}
+        isStreaming={streaming}
+        placeholder="Ask anything..."
+      />
       </div>
     </div>
   );
