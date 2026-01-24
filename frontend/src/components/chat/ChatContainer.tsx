@@ -5,29 +5,30 @@ import { EmptyChat } from './EmptyChat';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChatMessage as ChatMessageType } from '@/hooks/useChatMessages';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { ArrowDown } from 'lucide-react';
 
 function ChatSkeleton() {
   return (
     <div className="flex-1 py-8 chat-skeleton animate-pulse">
-      <div className="max-w-4xl mx-auto px-4 md:px-8 space-y-8">
+      <div className="max-w-3xl mx-auto px-4 md:px-8 space-y-12">
         {/* User message skeleton */}
-        <div className="flex flex-row-reverse gap-4">
-          <Skeleton className="w-9 h-9 rounded-full shrink-0" />
-          <div className="flex flex-col items-end flex-1 min-w-0">
-            <Skeleton className="h-14 w-64 rounded-2xl" />
+        <div className="flex gap-4 md:gap-8">
+          <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
+          <div className="flex flex-col flex-1 min-w-0 pt-1">
+            <Skeleton className="h-20 w-full max-w-lg rounded-2xl" />
           </div>
         </div>
 
         {/* Assistant message skeleton */}
-        <div className="flex gap-4">
-          <Skeleton className="w-9 h-9 rounded-full shrink-0" />
-          <div className="flex flex-col flex-1 gap-2 min-w-0 max-w-2xl">
+        <div className="flex gap-4 md:gap-8">
+          <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
+          <div className="flex flex-col flex-1 gap-4 min-w-0 pt-1">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-[90%]" />
             <Skeleton className="h-4 w-[95%]" />
-            <div className="h-4"></div>
-            <Skeleton className="h-4 w-[85%]" />
+            <div className="h-2"></div>
+            <Skeleton className="h-32 w-full rounded-xl" />
           </div>
         </div>
       </div>
@@ -45,9 +46,15 @@ interface ChatContainerProps {
   sessionId?: string | null;
   onShowLawyers: () => void;
   onUpdateMessage: (id: string, newContent: string) => Promise<void>;
+  onAddHighlight?: (messageId: string, start: number, end: number, color: string) => Promise<any>;
+  onRemoveHighlight?: (messageId: string, highlightId: string) => Promise<boolean>;
   chatType?: 'ai' | 'lawyer';
   consultationStatus?: 'request_sent' | 'accepted' | 'ongoing' | 'closed';
 }
+
+import { Bot, Gavel } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ConsultationRequestModal } from './ConsultationRequestModal';
 
 export function ChatContainer({
   messages,
@@ -59,13 +66,18 @@ export function ChatContainer({
   sessionId,
   onShowLawyers,
   onUpdateMessage,
+  onAddHighlight,
+  onRemoveHighlight,
 }: ChatContainerProps) {
+  const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isConsultModalOpen, setIsConsultModalOpen] = useState(false);
   const lastScrollTime = useRef(0);
   const isUserScrolling = useRef(false);
 
+  // ... (keeping existing hooks and callbacks)
   const checkIfAtBottom = useCallback(() => {
     if (!scrollRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
@@ -148,12 +160,19 @@ export function ChatContainer({
                 {messages.map((message, index) => (
                   <div key={message.id}>
                     <ChatMessage
+                      id={message.id}
                       role={message.role}
                       content={message.content}
+                      highlights={message.highlights}
                       isStreaming={streaming && index === messages.length - 1 && message.role === 'assistant'}
                       onShowLawyers={message.role === 'assistant' ? onShowLawyers : undefined}
                       onRegenerate={(!streaming && index === messages.length - 1 && message.role === 'assistant') ? () => { } : undefined}
                       onEdit={message.role === 'user' ? (newContent) => onUpdateMessage(message.id, newContent) : undefined}
+                      onAddHighlight={message.role === 'assistant' && onAddHighlight ?
+                        (start, end, color) => onAddHighlight(message.id, start, end, color) : undefined}
+                      onRemoveHighlight={message.role === 'assistant' && onRemoveHighlight ?
+                        (highlightId) => onRemoveHighlight(message.id, highlightId) : undefined}
+                      userAvatar={user?.avatarUrl}
                     />
                   </div>
                 ))}
@@ -190,12 +209,16 @@ export function ChatContainer({
       {/* Chat Input - Fixed at bottom */}
       <div className="shrink-0 border-t border-slate-200/50 dark:border-slate-700/50">
         <ChatInput
-        onSend={hasSession ? onSendMessage : onStartNewChat}
-        disabled={loading || streaming}
-        isStreaming={streaming}
-        placeholder="Ask anything..."
-      />
+          onSend={hasSession ? onSendMessage : onStartNewChat}
+          disabled={loading || streaming}
+          isStreaming={streaming}
+          placeholder="Ask anything..."
+        />
       </div>
+      <ConsultationRequestModal
+        isOpen={isConsultModalOpen}
+        onClose={() => setIsConsultModalOpen(false)}
+      />
     </div>
   );
 }

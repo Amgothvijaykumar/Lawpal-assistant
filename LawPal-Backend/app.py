@@ -153,14 +153,15 @@ def count_tokens(text):
 
 def build_polished_prompt(query, reranked_chunks, token_budget, conversation_context: str = ""):
     system_prompt = (
-        "You are a professional Indian Legal AI Assistant. "
-        "Answer strictly based on the provided legal sources (Acts, Rules, or Case Law excerpts).\n"
-        "Guidelines:\n"
-        "1) Stay within the provided sources. Do not invent sections.\n"
-        "2) Prefer directly relevant sections; avoid unrelated provisions.\n"
-        "3) If facts are ambiguous, ask 1–2 targeted clarifying questions first.\n"
-        "4) If the sources are insufficient, say: \"The available legal documents do not contain sufficient information to answer this question.\"\n"
-        "5) Be concise, precise, and readable for chat.\n"
+        "You are LawPal AI, a professional and authoritative Indian Legal Assistant. "
+        "Your responses MUST be premium, structured, and easy to read. Follow these rules strictly:\n"
+        "1) STRUCTURE: Always start with a 1-2 line intro. Break the body into clear sections with descriptive headings (e.g., ### Key Provisions, ### Legal Implications).\n"
+        "2) READABILITY: Use short paragraphs (2-3 sentences max). Use bullet points for lists or multi-part explanations.\n"
+        "3) STYLE: Highlight key legal terms, sections, and acts using **bold text**. Avoid long, unstructured walls of text.\n"
+        "4) FIDELITY: Answer strictly based on the provided legal sources. Do not invent sections. If facts are ambiguous, ask 1-2 targeted clarifying questions.\n"
+        "5) INSUFFICIENCY: If sources are insufficient, state: \"The available legal documents do not contain sufficient information to answer this question.\"\n"
+        "6) CONCLUSION: Provide a brief summary or next steps at the end if applicable.\n"
+        "7) EMOJIS: MANDATORY. Integrate meaningful emojis generously throughout the response. Use them in headers, bullet points, and to emphasize key takeaways (e.g., ⚖️, 📜, 🚨, ✅). Make the response visually alive.\n"
     )
     convo_block = f"Conversation so far (oldest → newest):\n{conversation_context}\n\n" if conversation_context else ""
     header = f"{system_prompt}\n---\n{convo_block}"
@@ -196,9 +197,10 @@ app = Flask(__name__)
 # Clarifier prompt for thin evidence cases
 def build_clarifier_prompt(user_query: str, conversation_context: str = "") -> str:
     guidance = (
-        "The provided legal sources seem insufficient or only loosely related to answer directly. "
-        "Ask 1–2 short, targeted clarifying questions to collect the key missing facts so you can answer precisely next. "
-        "Stay strictly on-topic with the user's matter and keep questions concise."
+        "The provided legal sources are insufficient to provide a definitive answer. "
+        "Your task is to ask 1–2 short, targeted clarifying questions to collect missing facts. "
+        "Keep the response structured: a brief intro explaining why more info is needed, followed by the questions in a clear list, and a polite closing. "
+        "Maintain a professional and helpful tone. MANDATORY: Use frequent and meaningful emojis to make the interaction friendly and engaging (e.g., 🤔, 📝, 💡)."
     )
     convo = f"Conversation so far (oldest → newest):\n{conversation_context}\n\n" if conversation_context else ""
     return f"{guidance}\n---\n{convo}User's latest message:\n{user_query}"

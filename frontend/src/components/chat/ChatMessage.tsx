@@ -1,13 +1,18 @@
-import { useState, useMemo } from 'react';
-import { User, Copy, Check, Pencil, RotateCcw, ThumbsUp, ThumbsDown, ChevronRight, Scale } from 'lucide-react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Copy, Check, Pencil, RotateCcw, ThumbsUp, ThumbsDown, ChevronRight, Scale, Volume2, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { polishResponse } from '@/lib/textPolishing';
+import { HighlightPopup } from './HighlightPopup';
+import type { Highlight } from '@/hooks/useChatMessages';
 
 // Custom theme for code blocks to match "GPT-style" (black background)
 const customCodeTheme = {
@@ -32,12 +37,17 @@ const customCodeTheme = {
 };
 
 interface ChatMessageProps {
-  role: 'user' | 'assistant';
+  id: string;
+  role: 'user' | 'assistant' | 'lawyer';
   content: string;
+  highlights?: Highlight[];
   isStreaming?: boolean;
   onRegenerate?: () => void;
   onShowLawyers?: () => void;
   onEdit?: (newContent: string) => void;
+  onAddHighlight?: (start: number, end: number, color: string) => void;
+  onRemoveHighlight?: (highlightId: string) => void;
+  userAvatar?: string;
 }
 
 // Code Block Component with Copy & Header
@@ -105,23 +115,113 @@ const CodeBlock = ({ node, inline, className, children, ...props }: any) => {
   );
 };
 
-export function ChatMessage({ role, content, isStreaming, onRegenerate, onShowLawyers, onEdit }: ChatMessageProps) {
+export function ChatMessage({ id, role, content, highlights = [], isStreaming, onRegenerate, onShowLawyers, onEdit, onAddHighlight, onRemoveHighlight, userAvatar }: ChatMessageProps) {
   const isUser = role === 'user';
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
 
-  // Add blinking cursor only during streaming and only at the very end of content
-  const displayContent = useMemo(() => {
-    if (isStreaming && !isUser) {
-      return content + ' ▍';
+  // Speech Synthesis State
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Highlight state
+  const [showHighlightPopup, setShowHighlightPopup] = useState(false);
+  const [highlightPopupPosition, setHighlightPopupPosition] = useState({ x: 0, y: 0 });
+  const [selectedRange, setSelectedRange] = useState<{ start: number; end: number } | null>(null);
+  const [existingHighlight, setExistingHighlight] = useState<Highlight | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // Cleanup speech on unmount
+  useEffect(() => {
+    return () => {
+      if (speechRef.current) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  const handleSpeak = () => {
+    try {
+      const synth = window.speechSynthesis;
+
+      // 1. If currently speaking this message, STOP.
+      if (isSpeaking) {
+        synth.cancel();
+        setIsSpeaking(false);
+        return;
+      }
+
+      // 2. Clear anything else currently speaking/queued
+      if (synth.speaking) {
+        synth.cancel();
+      }
+
+      // 3. Clean complex legal markdown for narration
+      const textToSpeak = content
+        .replace(/[*#`_~]/g, '')
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/- /g, '. ')
+        .replace(/\n/g, ' ')
+        .replace(/Section (\d+)/gi, 'Section $1')
+        .trim();
+
+      if (!textToSpeak) return;
+
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
+      // Get best English voice
+      const voices = synth.getVoices();
+      const naturalVoice = voices.find(v => v.lang.startsWith('en') && v.name.includes('Natural'))
+        || voices.find(v => v.lang.startsWith('en'))
+        || voices[0];
+
+      if (naturalVoice) utterance.voice = naturalVoice;
+      utterance.lang = 'en-US';
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+
+      utterance.onerror = (e) => {
+        // Suppress 'interrupted' / 'canceled' (Code 2) - these are not real errors
+        if (e.error !== 'interrupted' && e.error !== 'canceled') {
+          console.error('Speech synthesis error:', e);
+          toast.error("Speech issue. Try again.");
+        }
+        setIsSpeaking(false);
+      };
+
+      // 4. Start speech
+      synth.speak(utterance);
+    } catch (err) {
+      // Catch rare fatal errors but don't spam console
+      setIsSpeaking(false);
     }
-    return content;
+  };
+
+  // Add blinking cursor only during streaming and only at the very end of content
+  // Apply polishing pipeline (Part 2)
+  const displayContent = useMemo(() => {
+    if (isUser) return content;
+
+    // During streaming, keep polishing light to avoid UI jumps
+    if (isStreaming) {
+      // Basic cleaning during stream
+      const cleaned = content.trim().replace(/\n{3,}/g, '\n\n');
+      return cleaned;
+    }
+
+    // Full premium polishing for finished messages
+    return polishResponse(content);
   }, [content, isStreaming, isUser]);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
+    // Copy the polished version for a better user experience
+    const textToCopy = isUser ? content : displayContent;
+    await navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     toast.success('Copied to clipboard');
     setTimeout(() => setCopied(false), 2000);
@@ -131,6 +231,171 @@ export function ChatMessage({ role, content, isStreaming, onRegenerate, onShowLa
     setFeedback(type);
     toast.success(type === 'up' ? 'Thanks for your feedback!' : 'We\'ll improve based on your feedback');
   };
+
+  // Helper to extract confidence score and clean content
+  const { cleanedDisplayContent, confidenceScore } = useMemo(() => {
+    if (isUser) return { cleanedDisplayContent: displayContent, confidenceScore: null };
+
+    const confidenceMatch = displayContent.match(/Confidence:\s*(\d+(?:\/\d+)?)/i);
+    if (confidenceMatch) {
+      const score = confidenceMatch[1];
+      const cleaned = displayContent.replace(/Confidence:\s*\d+(?:\/\d+)?/gi, '').trim();
+      return { cleanedDisplayContent: cleaned, confidenceScore: score };
+    }
+
+    return { cleanedDisplayContent: displayContent, confidenceScore: null };
+  }, [displayContent, isUser]);
+
+  const [showConfidence, setShowConfidence] = useState(false);
+
+  // Handle text selection for highlighting (only for assistant messages)
+  const handleMouseUp = useCallback(() => {
+    if (isUser || isStreaming || !onAddHighlight) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const selectedText = selection.toString().trim();
+
+    if (!selectedText || !contentRef.current) return;
+
+    // Check if selection is within our content area
+    if (!contentRef.current.contains(range.commonAncestorContainer)) {
+      return;
+    }
+
+    // Check if selection is inside a code block (exclude code blocks)
+    const parentElement = range.commonAncestorContainer.parentElement;
+    if (parentElement?.closest('pre, code, .syntax-highlighter')) {
+      return;
+    }
+
+    // Calculate character indices relative to plain text content
+    const walker = document.createTreeWalker(
+      contentRef.current,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let charIndex = 0;
+    let startIndex = -1;
+    let endIndex = -1;
+    let node: Node | null;
+
+    while ((node = walker.nextNode())) {
+      const textNode = node as Text;
+      const nodeLength = textNode.length;
+
+      // Skip text inside code blocks
+      if (textNode.parentElement?.closest('pre, code')) {
+        continue;
+      }
+
+      if (range.startContainer === textNode) {
+        startIndex = charIndex + range.startOffset;
+      }
+      if (range.endContainer === textNode) {
+        endIndex = charIndex + range.endOffset;
+      }
+
+      charIndex += nodeLength;
+
+      if (startIndex !== -1 && endIndex !== -1) break;
+    }
+
+    if (startIndex === -1 || endIndex === -1 || startIndex >= endIndex) {
+      return;
+    }
+
+    // Check if selection overlaps with existing highlight
+    const overlappingHighlight = highlights.find(h =>
+      (startIndex < h.end && endIndex > h.start)
+    );
+
+    // Get selection position for popup
+    const rect = range.getBoundingClientRect();
+    const popupX = rect.left + rect.width / 2;
+    const popupY = rect.top;
+
+    setSelectedRange({ start: startIndex, end: endIndex });
+    setExistingHighlight(overlappingHighlight || null);
+    setHighlightPopupPosition({ x: popupX, y: popupY });
+    setShowHighlightPopup(true);
+
+    // Clear selection after showing popup
+    selection.removeAllRanges();
+  }, [isUser, isStreaming, highlights, onAddHighlight]);
+
+  // Handle applying highlight color
+  const handleApplyHighlight = useCallback((color: string) => {
+    if (!selectedRange || !onAddHighlight) return;
+    onAddHighlight(selectedRange.start, selectedRange.end, color);
+    setSelectedRange(null);
+  }, [selectedRange, onAddHighlight]);
+
+  // Handle removing highlight
+  const handleRemoveHighlight = useCallback((highlightId: string) => {
+    if (onRemoveHighlight) {
+      onRemoveHighlight(highlightId);
+    }
+  }, [onRemoveHighlight]);
+
+  // Close highlight popup
+  const closeHighlightPopup = useCallback(() => {
+    setShowHighlightPopup(false);
+    setSelectedRange(null);
+    setExistingHighlight(null);
+  }, []);
+
+  // Apply highlights to text content at render time
+  const renderHighlightedContent = useCallback((text: string) => {
+    if (!highlights || highlights.length === 0) {
+      return text;
+    }
+
+    // Sort highlights by start index
+    const sortedHighlights = [...highlights].sort((a, b) => a.start - b.start);
+
+    const segments: React.ReactNode[] = [];
+    let lastIndex = 0;
+
+    sortedHighlights.forEach((highlight, idx) => {
+      // Add text before highlight
+      if (highlight.start > lastIndex) {
+        segments.push(text.slice(lastIndex, highlight.start));
+      }
+
+      // Add highlighted text
+      const highlightedText = text.slice(highlight.start, highlight.end);
+      segments.push(
+        <mark
+          key={highlight.highlightId}
+          style={{
+            backgroundColor: `${highlight.color}40`, // 25% opacity
+            borderBottom: `2px solid ${highlight.color}`,
+            padding: '0 2px',
+            borderRadius: '2px',
+            cursor: 'pointer',
+          }}
+          data-highlight-id={highlight.highlightId}
+        >
+          {highlightedText}
+        </mark>
+      );
+
+      lastIndex = highlight.end;
+    });
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      segments.push(text.slice(lastIndex));
+    }
+
+    return segments;
+  }, [highlights]);
 
   const handleSaveEdit = () => {
     if (editedContent.trim() !== content && onEdit) {
@@ -145,31 +410,35 @@ export function ChatMessage({ role, content, isStreaming, onRegenerate, onShowLa
   };
 
   return (
-    <div className="group py-5 px-4 md:px-8 transition-colors duration-200">
+    <div className={cn(
+      "group py-8 px-4 md:px-8 transition-colors duration-200 w-full",
+      !isUser && "ai-message bg-slate-50/30 dark:bg-slate-900/10 border-y border-slate-100/50 dark:border-slate-800/50"
+    )}>
       <div className={cn(
-        'max-w-4xl mx-auto flex gap-4 md:gap-6',
+        'max-w-3xl mx-auto flex gap-4 md:gap-8 items-start',
         isUser ? 'flex-row-reverse' : 'flex-row'
       )}>
 
-        {/* Avatar */}
+        {/* Avatar Container */}
         <div className={cn(
-          'w-8 h-8 md:w-9 md:h-9 shrink-0 flex select-none flex-col justify-center items-center rounded-sm',
-          isUser ? 'bg-transparent' : 'bg-green-500/10'
+          'ai-avatar w-8 h-8 md:w-10 md:h-10 shrink-0 flex select-none flex-col justify-center items-center rounded-xl overflow-hidden shadow-sm',
+          'transition-transform duration-300 hover:scale-110 cursor-default',
+          isUser ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-gradient-to-br from-emerald-500 to-teal-600'
         )}>
           {isUser ? (
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-              <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-            </div>
+            userAvatar ? (
+              <img src={userAvatar} alt="User" className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            )
           ) : (
-            <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
-              <Scale className="w-4 h-4 md:w-5 md:h-5 text-white" />
-            </div>
+            <Scale className="w-5 h-5 text-white" />
           )}
         </div>
 
-        {/* Message Content */}
+        {/* Message Content Container */}
         <div className={cn(
-          'relative flex-1 overflow-hidden min-w-0',
+          'ai-content relative flex-1 overflow-hidden min-w-0 pt-0.5',
           isUser ? 'text-right' : 'text-left'
         )}>
 
@@ -182,46 +451,97 @@ export function ChatMessage({ role, content, isStreaming, onRegenerate, onShowLa
 
           {!isEditing ? (
             <div className={cn(
-              "prose dark:prose-invert max-w-none leading-[1.6] transition-all first:mt-0 text-base text-slate-800 dark:text-gray-200",
-              // Typography tweaks for GPT-style
-              "prose-p:mb-4 prose-p:last:mb-0",
-              "prose-headings:font-semibold prose-headings:tracking-tight prose-headings:mt-6 prose-headings:mb-3",
-              "prose-ul:my-4 prose-ul:list-disc prose-ul:pl-6",
-              "prose-ol:my-4 prose-ol:list-decimal prose-ol:pl-6",
-              "prose-li:my-1.5",
-              "prose-strong:font-semibold prose-strong:text-foreground",
-              "prose-blockquote:border-l-4 prose-blockquote:border-slate-300 dark:prose-blockquote:border-slate-700 prose-blockquote:pl-4 prose-blockquote:italic",
-              isUser && "bg-slate-100 dark:bg-slate-800/60 px-5 py-3.5 rounded-2xl rounded-tr-sm inline-block text-left text-base"
-            )}>
+              "max-w-none transition-all first:mt-0",
+              isUser ? (
+                "text-slate-900 px-6 py-3 rounded-2xl rounded-tr-sm inline-block text-left shadow-sm font-medium text-[15px] md:text-base leading-relaxed border border-slate-200/50"
+              ) : (
+                "relative w-full py-2" // Removed bg and border for model response
+              )
+            )}
+              style={isUser ? { backgroundColor: 'hsla(220, 14%, 96%, 0.4)' } : {}}
+            >
               {isUser ? (
                 <div className="whitespace-pre-wrap">{content}</div>
               ) : isStreaming ? (
-                // Stable Streaming State (Plain Text, Locked Typography)
+                // Stable Streaming State with CSS-driven typography
                 <div
-                  className="whitespace-pre-wrap text-base text-slate-800 dark:text-gray-200 font-normal"
-                  style={{ lineHeight: '1.6', letterSpacing: '0px' }}
-                >
-                  {content}
-                  <span className="text-indigo-500 ml-1 animate-pulse">▍</span>
-                </div>
-              ) : (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    code: CodeBlock,
-                    a: ({ node, ...props }) => <a className="text-primary hover:underline underline-offset-4" target="_blank" rel="noopener noreferrer" {...props} />,
-                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4 border rounded-lg"><table className="w-full text-base text-left" {...props} /></div>,
-                    thead: ({ node, ...props }) => <thead className="bg-slate-100 dark:bg-slate-800/50 uppercase text-xs" {...props} />,
-                    th: ({ node, ...props }) => <th className="px-4 py-3 font-semibold border-b" {...props} />,
-                    td: ({ node, ...props }) => <td className="px-4 py-3 border-b border-slate-100 dark:border-slate-800" {...props} />,
-                    p: ({ node, ...props }) => <p className="mb-3 last:mb-0 leading-[1.6]" {...props} />,
-                    ul: ({ node, ...props }) => <ul className="my-3 pl-6 list-disc space-y-1" {...props} />,
-                    ol: ({ node, ...props }) => <ol className="my-3 pl-6 list-decimal space-y-1" {...props} />,
-                    li: ({ node, ...props }) => <li className="leading-[1.6]" {...props} />,
+                  className="whitespace-pre-wrap"
+                  style={{
+                    letterSpacing: '-0.011em',
+                    lineHeight: '1.8'
                   }}
                 >
                   {displayContent}
-                </ReactMarkdown>
+                  <span className="text-indigo-500 ml-1 animate-pulse font-bold">▍</span>
+                </div>
+              ) : (
+                <div
+                  ref={contentRef}
+                  onMouseUp={handleMouseUp}
+                  className="select-text cursor-text"
+                >
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      code: CodeBlock,
+                      a: ({ node, ...props }) => <a className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline underline-offset-4" target="_blank" rel="noopener noreferrer" {...props} />,
+                      table: ({ node, ...props }) => (
+                        <div className="overflow-x-auto my-6 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm bg-white dark:bg-slate-950">
+                          <table className="w-full text-sm md:text-[15px] text-left border-collapse" {...props} />
+                        </div>
+                      ),
+                      thead: ({ node, ...props }) => <thead className="bg-slate-50 dark:bg-slate-900/80 text-slate-800 dark:text-slate-200 font-bold" {...props} />,
+                      th: ({ node, ...props }) => <th className="px-5 py-3 border-b border-slate-200 dark:border-slate-800" {...props} />,
+                      td: ({ node, ...props }) => <td className="px-5 py-3 border-b border-slate-100 dark:border-slate-900" {...props} />,
+                      // Structural elements will be styled by .ai-content CSS
+                      p: ({ node, children, ...props }) => <p {...props}>{typeof children === 'string' ? renderHighlightedContent(children) : children}</p>,
+                      h1: ({ node, ...props }) => <h1 {...props} />,
+                      h2: ({ node, ...props }) => <h2 {...props} />,
+                      h3: ({ node, ...props }) => <h3 {...props} />,
+                      ul: ({ node, ...props }) => <ul {...props} />,
+                      ol: ({ node, ...props }) => <ol {...props} />,
+                      li: ({ node, children, ...props }) => <li {...props}>{typeof children === 'string' ? renderHighlightedContent(children) : children}</li>,
+                      strong: ({ node, ...props }) => <strong className="font-bold text-slate-900 dark:text-white" {...props} />,
+                      hr: ({ node, ...props }) => <hr className="my-8 border-slate-200 dark:border-slate-800" {...props} />,
+                    }}
+                  >
+                    {cleanedDisplayContent}
+                  </ReactMarkdown>
+                </div>
+              )}
+
+              {/* Footer: Stats & Actions (Combined Row) */}
+              {!isUser && !isStreaming && (confidenceScore || onShowLawyers) && (
+                <div className="mt-6 pt-2 flex items-center justify-between border-t border-slate-200/40 dark:border-slate-700/40">
+
+                  {/* Left: Confidence Score (Hover to Reveal) */}
+                  {confidenceScore ? (
+                    <div className="group flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest select-none cursor-help">
+                      <div className={cn("w-1.5 h-1.5 rounded-full transition-colors", parseInt(confidenceScore) > 7 ? "bg-emerald-500 group-hover:bg-emerald-600" : "bg-amber-500 group-hover:bg-amber-600")} />
+                      <span className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 transition-colors">Score analysis</span>
+                      <span className={cn(
+                        "ml-0.5 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300",
+                        parseInt(confidenceScore) > 7 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                      )}>
+                        {confidenceScore}
+                      </span>
+                    </div>
+                  ) : <div />}
+
+                  {/* Right: Lawyer Suggestion */}
+                  {onShowLawyers && (
+                    <button
+                      onClick={onShowLawyers}
+                      className="group flex items-center gap-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      <span className="text-[10px] font-medium">
+                        Need a lawyer for this? <span className="font-bold ml-1 text-indigo-600 dark:text-indigo-400">View recommended lawyers</span>
+                      </span>
+                      <ChevronRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ) : (
@@ -244,6 +564,28 @@ export function ChatMessage({ role, content, isStreaming, onRegenerate, onShowLa
               "flex items-center gap-1.5 mt-2 transition-all duration-200",
               isUser ? "justify-end opacity-0 group-hover:opacity-100" : "opacity-100"
             )}>
+              {/* Speaker Button for AI Response (Leftmost for easy access) */}
+              {!isUser && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-7 w-7 rounded-md transition-colors mr-1",
+                    isSpeaking
+                      ? "text-indigo-600 bg-indigo-100 dark:bg-indigo-900/30"
+                      : "text-slate-400 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-600/80"
+                  )}
+                  onClick={handleSpeak}
+                  title={isSpeaking ? "Stop speaking" : "Read aloud"}
+                >
+                  {isSpeaking ? (
+                    <Square className="w-3.5 h-3.5 animate-pulse fill-current" />
+                  ) : (
+                    <Volume2 className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              )}
+
               <Button
                 variant="ghost"
                 size="icon"
@@ -302,21 +644,20 @@ export function ChatMessage({ role, content, isStreaming, onRegenerate, onShowLa
             </div>
           )}
 
-          {/* Lawyer Suggestion (Only for Assistant) */}
-          {!isUser && !isStreaming && onShowLawyers && (
-            <div className="mt-4 pt-3 flex items-center gap-2 text-sm border-t border-slate-100 dark:border-slate-800/50">
-              <span className="text-slate-500 dark:text-slate-400">Need a lawyer for this issue?</span>
-              <button
-                onClick={onShowLawyers}
-                className="flex items-center gap-1 font-semibold text-[#1e3a8a] dark:text-blue-400 hover:underline transition-all"
-              >
-                View recommended lawyers
-                <ChevronRight className="w-4 h-4 ml-0.5" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
+
+      {/* Highlight Color Popup */}
+      {showHighlightPopup && !isUser && !isStreaming && (
+        <HighlightPopup
+          position={highlightPopupPosition}
+          existingColor={existingHighlight?.color}
+          existingHighlightId={existingHighlight?.highlightId}
+          onApplyColor={handleApplyHighlight}
+          onRemoveHighlight={handleRemoveHighlight}
+          onClose={closeHighlightPopup}
+        />
+      )}
     </div>
   );
 }

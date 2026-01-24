@@ -78,35 +78,35 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
     border-radius: 3px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: rgba(148, 163, 184, 0.4);
     border-radius: 3px;
     transition: background 0.2s ease;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: rgba(148, 163, 184, 0.7);
   }
-  
+
   .dark .scrollbar-thin {
     scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
   }
-  
+
   .dark .scrollbar-thin::-webkit-scrollbar-thumb {
     background: rgba(100, 116, 139, 0.5);
   }
-  
+
   .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: rgba(100, 116, 139, 0.8);
   }
@@ -269,7 +269,12 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: 'Playfair Display', Georgia, serif;
     @apply font-semibold tracking-tight;
   }
@@ -281,6 +286,7 @@
 }
 
 @layer components {
+
   /* Chat message animations */
   .message-appear {
     animation: messageSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -291,6 +297,7 @@
       opacity: 0;
       transform: translateY(16px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -307,6 +314,7 @@
       opacity: 0;
       transform: translateY(20px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -323,6 +331,7 @@
       opacity: 0;
       transform: scale(0.95);
     }
+
     to {
       opacity: 1;
       transform: scale(1);
@@ -343,10 +352,14 @@
   }
 
   @keyframes typingBounce {
-    0%, 80%, 100% {
+
+    0%,
+    80%,
+    100% {
       transform: scale(0.6);
       opacity: 0.5;
     }
+
     40% {
       transform: scale(1);
       opacity: 1;
@@ -355,23 +368,19 @@
 
   /* Skeleton loading */
   .skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      hsl(var(--muted)) 0%,
-      hsl(var(--muted-foreground) / 0.08) 50%,
-      hsl(var(--muted)) 100%
-    );
+    background: linear-gradient(90deg,
+        hsl(var(--muted)) 0%,
+        hsl(var(--muted-foreground) / 0.08) 50%,
+        hsl(var(--muted)) 100%);
     background-size: 200% 100%;
     animation: shimmer 1.8s ease-in-out infinite;
   }
 
   .dark .skeleton-shimmer {
-    background: linear-gradient(
-      90deg,
-      hsl(var(--muted)) 0%,
-      hsl(var(--muted-foreground) / 0.15) 50%,
-      hsl(var(--muted)) 100%
-    );
+    background: linear-gradient(90deg,
+        hsl(var(--muted)) 0%,
+        hsl(var(--muted-foreground) / 0.15) 50%,
+        hsl(var(--muted)) 100%);
     background-size: 200% 100%;
   }
 
@@ -379,6 +388,7 @@
     0% {
       background-position: 200% 0;
     }
+
     100% {
       background-position: -200% 0;
     }
@@ -390,9 +400,12 @@
   }
 
   @keyframes skeletonPulse {
-    0%, 100% {
+
+    0%,
+    100% {
       opacity: 1;
     }
+
     50% {
       opacity: 0.5;
     }
@@ -414,6 +427,7 @@
       opacity: 0;
       transform: translateX(-10px);
     }
+
     to {
       opacity: 1;
       transform: translateX(0);
@@ -421,8 +435,13 @@
   }
 
   @keyframes chatSkeletonFade {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
 
   /* Scrollbar styling */
@@ -453,10 +472,178 @@
     backdrop-filter: blur(12px);
     background: hsl(var(--background) / 0.8);
   }
+
+  /* ============================================
+     AI CONTENT STYLING (GPT-LIKE)
+     ============================================ */
+
+  .ai-content {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.8;
+    /* Increased for better legibility */
+    word-spacing: 0.04em;
+    letter-spacing: -0.011em;
+    /* Premium tight feel */
+  }
+
+  /* Default color for light mode, light color for dark mode */
+  .ai-content {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .ai-content {
+    color: #eaeaea;
+  }
+
+  /* Paragraph Spacing & Rhythm */
+  .ai-content p {
+    margin-bottom: 1.25rem;
+    /* Increased for breathing room */
+    opacity: 0.95;
+  }
+
+  .ai-content p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Headings & Sections */
+  .ai-content h1,
+  .ai-content h2,
+  .ai-content h3 {
+    font-weight: 600;
+    margin: 1.2rem 0 0.6rem;
+    color: hsl(var(--foreground));
+    line-height: 1.3;
+  }
+
+  .dark .ai-content h1,
+  .dark .ai-content h2,
+  .dark .ai-content h3 {
+    color: #ffffff;
+  }
+
+  /* Headings visually separate thoughts with calm hierarchy */
+  .ai-content h1 {
+    font-size: 1.5rem;
+  }
+
+  .ai-content h2 {
+    font-size: 1.25rem;
+  }
+
+  .ai-content h3 {
+    font-size: 1.125rem;
+  }
+
+  /* Lists (Very Important) */
+  .ai-content ul,
+  .ai-content ol {
+    padding-left: 1.2rem;
+    margin: 0.6rem 0;
+    list-style-position: outside;
+  }
+
+  .ai-content li {
+    margin-bottom: 0.4rem;
+  }
+
+  .ai-content li:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Ensure no broken indentation and light feel */
+  .ai-content ul {
+    list-style-type: disc;
+  }
+
+  .ai-content ol {
+    list-style-type: decimal;
+  }
+
+  /* ✨ PART 8: INLINE CODE & HIGHLIGHTS */
+  .ai-content :not(pre)>code {
+    background: #1e1e1e;
+    color: #f8f8f2;
+    padding: 2px 6px;
+    border-radius: 5px;
+    font-size: 0.9em;
+  }
+
+  /* 🟡 PART 9: KEY INFO HIGHLIGHTING */
+  @keyframes highlight-pop {
+    from {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ai-highlight {
+    background: rgba(255, 200, 0, 0.12);
+    border-bottom: 1.5px solid rgba(255, 200, 0, 0.4);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-weight: 600;
+    color: #854d0e;
+    /* Darker amber for contrast */
+    display: inline-block;
+    line-height: 1;
+    transition: all 0.2s ease;
+    animation: highlight-pop 0.4s ease-out forwards;
+  }
+
+  .dark .ai-highlight {
+    background: rgba(255, 200, 0, 0.1);
+    color: #fbbf24;
+    /* Bright amber for dark mode */
+    border-bottom-color: rgba(255, 200, 0, 0.5);
+  }
+
+  /* 🧠 RESPONSE FLOW FEEL (SECRET SAUCE) */
+  /* First line slightly bolder for authoritative start */
+  .ai-content p:first-of-type::first-line {
+    font-weight: 700;
+    color: hsl(var(--foreground));
+  }
+
+  .dark .ai-content p:first-of-type::first-line {
+    color: #ffffff;
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+
+  /* 📱 MOBILE PERFECTION */
+  @media (max-width: 640px) {
+    .ai-content {
+      font-size: 15.5px;
+      /* Slightly smaller for mobile density but still legible */
+      line-height: 1.7;
+      word-spacing: 0.02em;
+    }
+
+    .ai-content p {
+      margin-bottom: 0.85rem;
+    }
+
+    .ai-content ul,
+    .ai-content ol {
+      padding-left: 1.1rem;
+      margin: 0.5rem 0;
+    }
+  }
+}
+
+/* Specificity fix for first line bolding to ensure it works */
+.ai-content p:first-of-type {
+  display: block;
 }

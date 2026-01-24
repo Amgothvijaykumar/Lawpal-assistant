@@ -52,37 +52,55 @@ export function Suggestions({ sessionId, onSelect, disabled }: SuggestionsProps)
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 fade-in-up">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-4 h-4 text-indigo-500" />
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Suggested Actions</p>
+    <div className="max-w-3xl mx-auto px-4 md:px-6 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center gap-2 mb-5 ml-1">
+        <div className="flex items-center justify-center w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/30">
+          <Sparkles className="w-3 h-3 text-indigo-600 dark:text-indigo-400 animate-pulse" />
+        </div>
+        <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+          Intelligent Next Steps
+        </p>
+        <div className="h-px flex-1 bg-gradient-to-r from-slate-200 dark:from-slate-800 to-transparent ml-2" />
       </div>
-      <div className="flex flex-wrap gap-3">
-        <AnimatePresence>
+
+      <div className="flex flex-wrap gap-2.5">
+        <AnimatePresence mode="popLayout">
           {suggestions.map((suggestion, index) => (
             <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              key={suggestion} // Use content as key for better transitions
+              initial={{ opacity: 0, scale: 0.9, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.2, delay: index * 0.05 }}
+              transition={{
+                duration: 0.4,
+                delay: index * 0.08,
+                ease: [0.23, 1, 0.32, 1]
+              }}
+              layout
             >
               <button
                 onClick={() => onSelect(suggestion)}
                 disabled={disabled}
                 className={cn(
-                  "group relative flex items-center gap-2 px-4 py-2.5",
-                  "bg-white dark:bg-slate-800",
-                  "border border-slate-200 dark:border-slate-700",
-                  "rounded-full text-sm text-slate-600 dark:text-slate-300",
-                  "shadow-sm hover:shadow-md transition-all duration-200",
-                  "hover:border-indigo-200 dark:hover:border-indigo-800",
-                  "hover:text-indigo-600 dark:hover:text-indigo-400",
-                  disabled && "opacity-50 cursor-not-allowed"
+                  "group relative flex items-center gap-2.5 px-4 py-2.5",
+                  "bg-white dark:bg-slate-900/80 backdrop-blur-md",
+                  "border border-slate-200 dark:border-slate-800",
+                  "rounded-xl text-[13px] font-medium text-slate-600 dark:text-slate-300",
+                  "shadow-sm hover:shadow-indigo-500/10 transition-all duration-300",
+                  "hover:border-indigo-400 dark:hover:border-indigo-500/50",
+                  "hover:bg-indigo-50/50 dark:hover:bg-indigo-500/5",
+                  "hover:text-indigo-700 dark:hover:text-indigo-400",
+                  "active:scale-95",
+                  disabled && "opacity-50 cursor-not-allowed grayscale"
                 )}
               >
-                <span>{suggestion}</span>
-                <ArrowRight className="w-3.5 h-3.5 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all duration-200 text-indigo-500" />
+                <span className="relative z-10">{suggestion}</span>
+                <div className="w-4 h-4 rounded-full bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900 transition-colors">
+                  <ArrowRight className="w-2.5 h-2.5 text-indigo-500 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+
+                {/* Subtle border glow on hover */}
+                <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-500 ring-1 ring-inset ring-indigo-500/20" />
               </button>
             </motion.div>
           ))}

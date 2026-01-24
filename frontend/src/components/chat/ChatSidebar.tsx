@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { 
-  Plus, MessageSquare, MoreHorizontal, Pencil, Trash2, 
+import {
+  Plus, MessageSquare, MoreHorizontal, Pencil, Trash2,
   Search, Scale, ChevronLeft, ChevronRight, Settings,
-  FileText, Pin, Share2, User2, X
+  FileText, Pin, Share2, User2, X, Briefcase
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +38,8 @@ interface ChatSidebarProps {
   onOpenSettings: () => void;
   onOpenChat: () => void;
   onOpenDocuments: () => void;
+  onOpenLawyerConsultation: () => void;
+  activeView: string;
 }
 
 export function ChatSidebar({
@@ -54,6 +56,8 @@ export function ChatSidebar({
   onOpenSettings,
   onOpenChat,
   onOpenDocuments,
+  onOpenLawyerConsultation,
+  activeView,
 }: ChatSidebarProps) {
   const { user, signOut } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,34 +78,39 @@ export function ChatSidebar({
   };
 
   // Filter sessions based on search
+  // Filter sessions based on search
   const filteredSessions = sessions.filter(session =>
     session.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group sessions by date
+  // Split into AI and Lawyer sessions
+  const aiSessions = filteredSessions.filter(s => s.type !== 'lawyer');
+  const lawyerSessions = filteredSessions.filter(s => s.type === 'lawyer');
+
+  // Group AI sessions by date
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const todaySessions = filteredSessions.filter(s => {
-    const date = new Date(s.updated_at);
+  const todaySessions = aiSessions.filter(s => {
+    const date = new Date(s.updated_at || new Date());
     return date.toDateString() === today.toDateString();
   });
 
-  const yesterdaySessions = filteredSessions.filter(s => {
-    const date = new Date(s.updated_at);
+  const yesterdaySessions = aiSessions.filter(s => {
+    const date = new Date(s.updated_at || new Date());
     return date.toDateString() === yesterday.toDateString();
   });
 
-  const olderSessions = filteredSessions.filter(s => {
-    const date = new Date(s.updated_at);
-    return date.toDateString() !== today.toDateString() && 
-           date.toDateString() !== yesterday.toDateString();
+  const olderSessions = aiSessions.filter(s => {
+    const date = new Date(s.updated_at || new Date());
+    return date.toDateString() !== today.toDateString() &&
+      date.toDateString() !== yesterday.toDateString();
   });
 
   const renderSessionItem = (session: ChatSession) => {
     const isActive = currentSessionId === session.id;
-    
+
     return (
       <div
         key={session.id}
@@ -113,8 +122,12 @@ export function ChatSidebar({
         )}
         onClick={() => onSelectSession(session.id)}
       >
-        <MessageSquare className="w-4 h-4 shrink-0 opacity-70" />
-        
+        {session.type === 'lawyer' ? (
+          <Briefcase className="w-4 h-4 shrink-0 opacity-70" />
+        ) : (
+          <MessageSquare className="w-4 h-4 shrink-0 opacity-70" />
+        )}
+
         {!isCollapsed && (
           <>
             {editingId === session.id ? (
@@ -181,7 +194,7 @@ export function ChatSidebar({
   );
 
   return (
-    <aside 
+    <aside
       className={cn(
         'h-full flex flex-col transition-all duration-300 ease-out',
         'bg-[#F8FAFC] border-r border-[#E5E7EB]',
@@ -202,7 +215,7 @@ export function ChatSidebar({
               <span className="font-serif font-semibold text-foreground text-base">ACTRIGHT</span>
             )}
           </div>
-          
+
           {!isCollapsed && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -219,7 +232,7 @@ export function ChatSidebar({
             </Tooltip>
           )}
         </div>
-        
+
         {isCollapsed && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -288,95 +301,123 @@ export function ChatSidebar({
 
       {/* Sessions List */}
       <ScrollArea className="flex-1 px-1.5 py-3">
-        {loading ? (
-          <div className="space-y-2 px-1.5">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full rounded-lg" />
-            ))}
-          </div>
-        ) : filteredSessions.length === 0 ? (
-          !isCollapsed && (
-            <div className="text-center py-8 text-muted-foreground/60 text-sm">
-              {searchQuery ? 'No chats found' : 'No chats yet'}
+        <div className="space-y-5">
+          {/* Primary Actions - Only show when not searching */}
+          {!loading && !searchQuery && (
+            <>
+              {/* Consultation Section (Manual) */}
+              {!isCollapsed && (
+                <div className="mb-4">
+                  <SectionLabel>Consultation</SectionLabel>
+                  <button
+                    onClick={onOpenLawyerConsultation}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 mx-3 rounded-lg text-sm font-medium transition-all duration-200 text-left border-l-[3px] pr-8 box-border width-[calc(100%-1.5rem)]',
+                      activeView === 'lawyer-consultation'
+                        ? 'bg-primary/5 border-primary text-primary'
+                        : 'border-transparent text-muted-foreground/70 hover:bg-[#EEF2FF] hover:text-foreground'
+                    )}
+                  >
+                    <Briefcase className={cn("w-4 h-4", activeView === 'lawyer-consultation' ? "text-primary" : "opacity-70")} />
+                    {user?.role === 'lawyer' ? 'Client Requests' : 'Talk to a Lawyer'}
+                  </button>
+                </div>
+              )}
+
+              {/* Document Section */}
+              {!isCollapsed && (
+                <div className="mb-6">
+                  <SectionLabel>Documents</SectionLabel>
+                  <button
+                    onClick={onOpenDocuments}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-2.5 mx-3 rounded-lg text-sm font-medium transition-all duration-200 text-left border-l-[3px] pr-8 box-border width-[calc(100%-1.5rem)]',
+                      activeView === 'documents'
+                        ? 'bg-primary/5 border-primary text-primary'
+                        : 'border-transparent text-muted-foreground/70 hover:bg-[#EEF2FF] hover:text-foreground'
+                    )}
+                  >
+                    <FileText className={cn("w-4 h-4", activeView === 'documents' ? "text-primary" : "opacity-70")} />
+                    Upload Documents
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Consultations (Lawyer Chats) */}
+          {lawyerSessions.length > 0 && (
+            <div>
+              {!isCollapsed && <SectionLabel>Consultations</SectionLabel>}
+              <div className="space-y-0.5 px-1.5 mb-4">
+                {lawyerSessions.map(renderSessionItem)}
+              </div>
             </div>
-          )
-        ) : (
-          <div className="space-y-5">
-            {/* Chat Section */}
-            {!isCollapsed && (
-              <div>
-                <SectionLabel>Chat</SectionLabel>
-                <div 
-                  className="px-3 py-4 text-sm text-muted-foreground/60 text-center cursor-pointer hover:bg-[#EEF2FF] rounded-lg transition-colors mx-3"
-                  onClick={onOpenChat}
-                >
-                  <MessageSquare className="w-4 h-4 mx-auto mb-1 opacity-50" />
-                  Start AI Chat
-                </div>
+          )}
+
+          {/* History Section (AI Chats) */}
+          {loading ? (
+            <div className="space-y-2 px-1.5">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : (lawyerSessions.length === 0 && aiSessions.length === 0) ? (
+            !isCollapsed && (
+              <div className="text-center py-8 text-muted-foreground/60 text-sm">
+                {searchQuery ? 'No chats found' : 'No history yet'}
               </div>
-            )}
+            )
+          ) : (
+            <>
+              {/* AI History Header - Only show if there ARE AI sessions */}
+              {(todaySessions.length > 0 || yesterdaySessions.length > 0 || olderSessions.length > 0) && (
+                <>
+                  {!isCollapsed && <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 mb-1.5">AI History</p>}
+                </>
+              )}
 
-            {/* Document Section */}
-            {!isCollapsed && (
-              <div>
-                <SectionLabel>Documents</SectionLabel>
-                <div 
-                  className="px-3 py-4 text-sm text-muted-foreground/60 text-center cursor-pointer hover:bg-[#EEF2FF] rounded-lg transition-colors mx-3"
-                  onClick={onOpenDocuments}
-                >
-                  <FileText className="w-4 h-4 mx-auto mb-1 opacity-50" />
-                  Upload Documents
-                </div>
-              </div>
-            )}
-
-            {/* History Header */}
-            {(todaySessions.length > 0 || yesterdaySessions.length > 0 || olderSessions.length > 0) && (
-              <>
-                {!isCollapsed && <p className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider px-3 mb-1.5">History</p>}
-              </>
-            )}
-
-            {/* Today */}
-            {todaySessions.length > 0 && (
-              <div>
-                {!isCollapsed && <SectionLabel>Today</SectionLabel>}
-                <div className="space-y-0.5 px-1.5">
-                  {todaySessions.map(renderSessionItem)}
-                </div>
-              </div>
-            )}
-
-            {/* Yesterday and Older with Scrolling */}
-            {(yesterdaySessions.length > 0 || olderSessions.length > 0) && (
-              <div>
-                <ScrollArea className="max-h-64">
-                  <div className="space-y-0.5 px-1.5 pr-2">
-                    {/* Yesterday */}
-                    {yesterdaySessions.length > 0 && (
-                      <div className="mb-3">
-                        {!isCollapsed && <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-3 mb-2">Yesterday</p>}
-                        <div className="space-y-0.5">
-                          {yesterdaySessions.map(renderSessionItem)}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Older Sessions */}
-                    {olderSessions.length > 0 && (
-                      <div>
-                        {!isCollapsed && <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-3 mb-2">Older</p>}
-                        <div className="space-y-0.5">
-                          {olderSessions.map(renderSessionItem)}
-                        </div>
-                      </div>
-                    )}
+              {/* Today */}
+              {todaySessions.length > 0 && (
+                <div>
+                  {!isCollapsed && <SectionLabel>Today</SectionLabel>}
+                  <div className="space-y-0.5 px-1.5">
+                    {todaySessions.map(renderSessionItem)}
                   </div>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
-        )}
+                </div>
+              )}
+
+              {/* Yesterday and Older with Scrolling */}
+              {(yesterdaySessions.length > 0 || olderSessions.length > 0) && (
+                <div>
+                  <ScrollArea className="max-h-64">
+                    <div className="space-y-0.5 px-1.5 pr-2">
+                      {/* Yesterday */}
+                      {yesterdaySessions.length > 0 && (
+                        <div className="mb-3">
+                          {!isCollapsed && <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-3 mb-2">Yesterday</p>}
+                          <div className="space-y-0.5">
+                            {yesterdaySessions.map(renderSessionItem)}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Older Sessions */}
+                      {olderSessions.length > 0 && (
+                        <div>
+                          {!isCollapsed && <p className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider px-3 mb-2">Older</p>}
+                          <div className="space-y-0.5">
+                            {olderSessions.map(renderSessionItem)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </ScrollArea>
 
       {/* Divider */}
@@ -390,9 +431,15 @@ export function ChatSidebar({
               'w-full flex items-center gap-3 p-2 rounded-lg hover:bg-[#EEF2FF] transition-colors cursor-pointer',
               isCollapsed && 'justify-center'
             )}>
-              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary shrink-0 border border-primary/20">
-                {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
-              </div>
+              {user?.avatarUrl ? (
+                <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-primary/20 shadow-sm">
+                  <img src={user.avatarUrl} alt="User Avatar" className="w-full h-full object-cover" />
+                </div>
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary shrink-0 border border-primary/20">
+                  {user?.displayName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+                </div>
+              )}
               {!isCollapsed && (
                 <>
                   <div className="flex-1 min-w-0 text-left">
@@ -422,6 +469,6 @@ export function ChatSidebar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </aside>
+    </aside >
   );
 }

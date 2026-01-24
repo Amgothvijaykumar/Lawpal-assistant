@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 type UserRole = 'user' | 'lawyer';
 
@@ -9,6 +10,14 @@ interface Profile {
   displayName: string;
   email: string;
   avatarUrl: string | null;
+  profileCompleted: boolean;
+  location?: {
+    city?: string;
+    state?: string;
+    district?: string;
+    coordinates?: [number, number];
+  };
+  lawyerDetails?: any; // To store lawyer specific data
 }
 
 interface AuthContextType {
@@ -18,6 +27,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, role: UserRole, displayName?: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  updateProfile: (data: Partial<Profile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,7 +50,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: data.role,
         displayName: data.displayName,
         email: data.email,
-        avatarUrl: data.avatarUrl
+        avatarUrl: data.avatarUrl,
+        profileCompleted: data.profileCompleted,
+        location: data.location,
+        lawyerDetails: data.lawyerDetails
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -72,7 +86,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: data.user.role,
         displayName: data.user.displayName,
         email: data.user.email,
-        avatarUrl: null
+        avatarUrl: null,
+        profileCompleted: false
       });
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Registration failed');
@@ -92,7 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: data.user.role,
         displayName: data.user.displayName,
         email: data.user.email,
-        avatarUrl: data.user.avatarUrl
+        avatarUrl: data.user.avatarUrl,
+        profileCompleted: data.user.profileCompleted || false
       });
     } catch (error: any) {
       throw new Error(error.response?.data?.error || 'Login failed');
@@ -105,8 +121,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('auth_token');
   };
 
+  const refreshProfile = async () => {
+    if (token) await fetchProfile(token);
+  };
+
+  const updateProfile = async (updateData: Partial<Profile>) => {
+    if (!token) return;
+    try {
+      const { data } = await axios.patch(`${API_URL}/auth/profile`, updateData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser({
+        id: data.user._id,
+        role: data.user.role,
+        displayName: data.user.displayName,
+        email: data.user.email,
+        avatarUrl: data.user.avatarUrl,
+        profileCompleted: data.user.profileCompleted,
+        location: data.user.location,
+        lawyerDetails: data.user.lawyerDetails
+      });
+      toast.success('Profile updated successfully');
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast.error(error.response?.data?.error || 'Update failed');
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, token, loading, signUp, signIn, signOut, refreshProfile, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

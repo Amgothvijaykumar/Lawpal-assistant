@@ -2,11 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useSocket } from '@/hooks/useSocket';
+
+export interface Highlight {
+  highlightId: string;
+  start: number;
+  end: number;
+  color: string;
+  createdAt: string;
+}
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'lawyer';
   content: string;
+  highlights?: Highlight[];
   created_at: string;
 }
 
@@ -25,6 +35,38 @@ export function useChatMessages(sessionId: string | null) {
   const [streaming, setStreaming] = useState(false);
   const { token } = useAuth();
   const { toast } = useToast();
+  const { socket, joinSession } = useSocket();
+
+  useEffect(() => {
+    if (sessionId) {
+      joinSession(sessionId);
+    }
+  }, [sessionId, joinSession]);
+
+  useEffect(() => {
+    if (socket && sessionId) {
+      const handleNewMessage = (msg: any) => {
+        if (msg.sessionId === sessionId) {
+          setMessages(prev => {
+            // Check if message already exists (robust string comparison)
+            if (prev.some(m => String(m.id) === String(msg.id))) return prev;
+
+            return [...prev, {
+              id: msg.id,
+              role: msg.role,
+              content: msg.content,
+              created_at: msg.createdAt || msg.created_at
+            }];
+          });
+        }
+      };
+
+      socket.on('chat:message_new', handleNewMessage);
+      return () => {
+        socket.off('chat:message_new', handleNewMessage);
+      };
+    }
+  }, [socket, sessionId]);
 
   const fetchMessages = useCallback(async () => {
     if (!sessionId || !token) {
@@ -42,10 +84,11 @@ export function useChatMessages(sessionId: string | null) {
       });
 
       const normalizedMessages = data.map((m: any) => ({
-        id: m._id,
+        id: m._id?.toString() || m.id?.toString() || String(Math.random()),
         role: m.role,
         content: m.content,
-        created_at: m.createdAt
+        highlights: m.highlights || [],
+        created_at: m.createdAt || m.created_at
       }));
 
       setMessages(normalizedMessages);
@@ -77,7 +120,7 @@ export function useChatMessages(sessionId: string | null) {
     fetchMessages();
   }, [fetchMessages]);
 
-  const saveMessage = async (role: 'user' | 'assistant', content: string) => {
+  const saveMessage = async (role: 'user' | 'assistant' | 'lawyer', content: string) => {
     if (!sessionId || !token) return null;
 
     try {
@@ -112,22 +155,39 @@ export function useChatMessages(sessionId: string | null) {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  const sendMessage = async (content: string, options?: { manualRole?: 'user' | 'lawyer' | 'assistant', skipAI?: boolean }) => {
     if (!sessionId || streaming || !token) return;
 
-    // Add user message to UI immediately
-    const tempUserMsg: ChatMessage = {
-      id: `temp-user-${Date.now()}`,
-      role: 'user',
+    const role = options?.manualRole || 'user';
+
+    // Add message to UI immediately
+    const tempMsg: ChatMessage = {
+      id: `temp-${role}-${Date.now()}`,
+      role: role as any,
       content,
       created_at: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, tempUserMsg]);
+    setMessages(prev => [...prev, tempMsg]);
 
-    // Validates duplicate save logic removal
-    // Backend /api/chat endpoint already saves the user message
-    // We strictly rely on the final backend sync to update the ID
-
+    // If it's a manual message (like lawyer chat), just save and return
+    if (options?.skipAI) {
+      const saved = await saveMessage(role as any, content);
+      if (saved) {
+        setMessages(prev => {
+          // Check if socket already added this message
+          const exists = prev.some(m => String(m.id) === String(saved.id));
+          if (exists) {
+            // Just remove the temporary one
+            return prev.filter(m => m.id !== tempMsg.id);
+          }
+          // Otherwise replace temp with real
+          return prev.map(m => m.id === tempMsg.id ? { ...saved, id: String(saved.id) } : m);
+        });
+      } else {
+        setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
+      }
+      return;
+    }
 
     // AI Response with streaming - OPTIMIZED
     setStreaming(true);
@@ -299,6 +359,7 @@ export function useChatMessages(sessionId: string | null) {
                     id: m._id,
                     role: m.role,
                     content: m.content,
+                    highlights: m.highlights || [],
                     created_at: m.createdAt
                   }));
 
@@ -392,12 +453,73 @@ export function useChatMessages(sessionId: string | null) {
     }
   };
 
+  // Add highlight to a message
+  const addHighlight = async (messageId: string, start: number, end: number, color: string) => {
+    if (!token) return null;
+
+    try {
+      const { data } = await axios.post(
+        `${API_URL}/chat/messages/${messageId}/highlights`,
+        { start, end, color },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update local state with new highlight
+      setMessages(prev => prev.map(m =>
+        m.id === messageId
+          ? { ...m, highlights: [...(m.highlights || []), data.highlight] }
+          : m
+      ));
+
+      return data.highlight;
+    } catch (error: any) {
+      console.error('Failed to add highlight:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to add highlight.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  // Remove highlight from a message
+  const removeHighlight = async (messageId: string, highlightId: string) => {
+    if (!token) return false;
+
+    try {
+      await axios.delete(
+        `${API_URL}/chat/messages/${messageId}/highlights/${highlightId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update local state
+      setMessages(prev => prev.map(m =>
+        m.id === messageId
+          ? { ...m, highlights: (m.highlights || []).filter(h => h.highlightId !== highlightId) }
+          : m
+      ));
+
+      return true;
+    } catch (error: any) {
+      console.error('Failed to remove highlight:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to remove highlight.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   return {
     messages,
     loading,
     streaming,
     sendMessage,
     updateMessage,
+    addHighlight,
+    removeHighlight,
     refreshMessages: fetchMessages,
   };
 }

@@ -3,19 +3,23 @@ import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatContainer } from './ChatContainer';
-import { EnhancedChatView } from './EnhancedChatView';
+import { LawyerChatContainer } from './LawyerChatContainer';
+import { RecommendedLawyers } from './RecommendedLawyers';
+import { LawyerDashboard } from './LawyerDashboard';
 import { EnhancedDocumentView } from '../documents/EnhancedDocumentView';
 import { ProfileSheet } from '../profile/ProfileSheet';
 import { SettingsSheet } from '../settings/SettingsSheet';
+import { ProfileCompletionModal } from '../profile/ProfileCompletionModal';
 import { LawyerPanel } from './LawyerPanel';
 import { CaseSummaryPanel } from './CaseSummaryPanel';
 import { useChatSessions } from '@/hooks/useChatSessions';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
 type ChatType = 'ai' | 'lawyer';
 type ConsultationStatus = 'request_sent' | 'accepted' | 'ongoing' | 'closed';
-type ViewMode = 'chat' | 'enhanced-chat' | 'documents' | 'session';
+type ViewMode = 'chat' | 'enhanced-chat' | 'documents' | 'session' | 'lawyer-consultation';
 
 export function ChatLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -24,11 +28,45 @@ export function ChatLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showLawyerPanel, setShowLawyerPanel] = useState(false);
   const [showCaseSummary, setShowCaseSummary] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('session');
+
+  // Persist viewMode in localStorage
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('actright_viewMode');
+    return (saved as ViewMode) || 'session';
+  });
 
   // Enhanced state for lawyer chat features
-  const [currentChatType, setCurrentChatType] = useState<ChatType>('ai');
+  const { user, refreshProfile } = useAuth();
+  const [currentChatType, setCurrentChatType] = useState<ChatType>(() => {
+    const saved = localStorage.getItem('actright_chatType');
+    return (saved as ChatType) || 'ai';
+  });
   const [consultationStatus, setConsultationStatus] = useState<ConsultationStatus>('request_sent');
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+
+  // Persist viewMode changes
+  useEffect(() => {
+    localStorage.setItem('actright_viewMode', viewMode);
+  }, [viewMode]);
+
+  // Persist chatType changes
+  useEffect(() => {
+    localStorage.setItem('actright_chatType', currentChatType);
+  }, [currentChatType]);
+
+  useEffect(() => {
+    if (user && !user.profileCompleted) {
+      const timer = setTimeout(() => {
+        setShowCompletionModal(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
+  const handleProfileComplete = async () => {
+    setShowCompletionModal(false);
+    await refreshProfile();
+  };
 
   const {
     sessions,
@@ -38,6 +76,7 @@ export function ChatLayout() {
     createSession,
     renameSession,
     deleteSession,
+    refreshSessions,
   } = useChatSessions();
 
   const {
@@ -46,6 +85,8 @@ export function ChatLayout() {
     streaming,
     sendMessage,
     updateMessage,
+    addHighlight,
+    removeHighlight,
   } = useChatMessages(currentSessionId);
 
   // DO NOT auto-select any session on page load
@@ -64,29 +105,71 @@ export function ChatLayout() {
     }
   };
 
+  const handleSendLawyerMessage = async (content: string) => {
+    if (!currentSessionId) return;
+    sendMessage(content, {
+      skipAI: true,
+      manualRole: user?.role === 'lawyer' ? 'lawyer' : 'user'
+    });
+  };
+
   const handleSelectSession = (id: string) => {
     setCurrentSessionId(id);
     setViewMode('session');
-    // Determine chat type based on session ID (mock logic)
-    setCurrentChatType(id.includes('lawyer') ? 'lawyer' : 'ai');
+
+    // Determine chat type based on real session data
+    const selectedSession = sessions.find(s => s.id === id);
+    if (selectedSession) {
+      setCurrentChatType(selectedSession.type);
+    } else {
+      // Fallback or default
+      setCurrentChatType('ai');
+    }
   };
 
-  const handleOpenChat = () => {
-    setViewMode('enhanced-chat');
+  const handleOpenChat = async () => {
+    // Start AI chat by default from sidebar "Start AI Chat" button
+    setCurrentChatType('ai');
+    if (!currentSessionId) {
+      await createSession('New Chat', 'ai');
+    }
+    setViewMode('session');
   };
 
   const handleOpenDocuments = () => {
     setViewMode('documents');
   };
 
+  const handleOpenLawyerConsultation = () => {
+    setViewMode('lawyer-consultation');
+  };
+
   const renderMainContent = () => {
     switch (viewMode) {
-      case 'enhanced-chat':
-        return <EnhancedChatView />;
+      case 'lawyer-consultation':
+        // If lawyer, show Dashboard. If user, show Marketplace.
+        if (user?.role === 'lawyer') {
+          return <LawyerDashboard onOpenChat={handleSelectSession} onRefreshSessions={refreshSessions} />;
+        }
+        return <RecommendedLawyers onOpenChat={handleSelectSession} />;
       case 'documents':
         return <EnhancedDocumentView />;
       case 'session':
-      default:
+        // If current session is lawyer type, render LawyerChatContainer
+        if (currentChatType === 'lawyer') {
+          const session = sessions.find(s => s.id === currentSessionId);
+          return (
+            <LawyerChatContainer
+              messages={messages}
+              loading={messagesLoading}
+              onSendMessage={handleSendLawyerMessage}
+              onClose={() => setViewMode('session')}
+              sessionTitle={session?.title}
+              isLawyer={user?.role === 'lawyer'}
+            />
+          );
+        }
+        // Else render AI ChatContainer
         return (
           <ChatContainer
             messages={messages}
@@ -100,6 +183,8 @@ export function ChatLayout() {
             consultationStatus={consultationStatus}
             onShowLawyers={() => setShowLawyerPanel(true)}
             onUpdateMessage={updateMessage}
+            onAddHighlight={addHighlight}
+            onRemoveHighlight={removeHighlight}
           />
         );
     }
@@ -144,6 +229,8 @@ export function ChatLayout() {
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenChat={handleOpenChat}
           onOpenDocuments={handleOpenDocuments}
+          onOpenLawyerConsultation={handleOpenLawyerConsultation}
+          activeView={viewMode}
         />
       </aside>
 
@@ -161,6 +248,7 @@ export function ChatLayout() {
           {renderMainContent()}
         </div>
       </main>
+
 
       {/* Case Summary Panel */}
       {showCaseSummary && currentSessionId && currentChatType === 'lawyer' && (
@@ -198,6 +286,11 @@ export function ChatLayout() {
       <div className="preload-fonts absolute pointer-events-none opacity-0 select-none -z-50">
         Preload .
       </div>
+
+      <ProfileCompletionModal
+        isOpen={showCompletionModal}
+        onComplete={handleProfileComplete}
+      />
     </div>
   );
 }

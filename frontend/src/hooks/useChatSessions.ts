@@ -19,9 +19,24 @@ const API_URL = import.meta.env.VITE_API_BASE_URL;
 export function useChatSessions() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  
+  // Persist currentSessionId in localStorage
+  const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(() => {
+    return localStorage.getItem('actright_currentSessionId');
+  });
+  
   const { user, token } = useAuth();
   const { toast } = useToast();
+
+  // Wrapper to persist session ID changes
+  const setCurrentSessionId = useCallback((id: string | null) => {
+    setCurrentSessionIdState(id);
+    if (id) {
+      localStorage.setItem('actright_currentSessionId', id);
+    } else {
+      localStorage.removeItem('actright_currentSessionId');
+    }
+  }, []);
 
   const fetchSessions = useCallback(async () => {
     if (!token) {
@@ -43,6 +58,17 @@ export function useChatSessions() {
       }));
 
       setSessions(normalizedSessions);
+      
+      // Validate persisted session ID still exists
+      const savedSessionId = localStorage.getItem('actright_currentSessionId');
+      if (savedSessionId) {
+        const sessionExists = normalizedSessions.some((s: ChatSession) => s.id === savedSessionId);
+        if (!sessionExists) {
+          // Session no longer exists, clear it
+          localStorage.removeItem('actright_currentSessionId');
+          setCurrentSessionIdState(null);
+        }
+      }
     } catch (error) {
       console.error('Error fetching sessions:', error);
       toast({

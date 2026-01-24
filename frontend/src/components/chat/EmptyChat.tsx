@@ -7,33 +7,33 @@ interface EmptyChatProps {
 const suggestions = [
   {
     icon: FileText,
-    title: 'Document Review',
-    prompt: 'Review this rental agreement for any hidden risks or unfair clauses.',
-  },
-  {
-    icon: Users,
-    title: 'Family Law',
-    prompt: 'What are my legal rights regarding annual visitation and child custody?',
+    title: 'Agreement Review',
+    prompt: 'Check this rental agreement for any unfair clauses or hidden legal risks.',
   },
   {
     icon: Shield,
-    title: 'Consumer Rights',
-    prompt: 'I was sold a defective product and denied a refund. Draft a consumer complaint.',
+    title: 'Cyber Fraud Help',
+    prompt: 'I have been a victim of online banking fraud. What are my first legal steps?',
   },
   {
     icon: Gavel,
-    title: 'Criminal Law',
-    prompt: 'Explain the procedure for filing an FIR for online financial fraud.',
+    title: 'Filing an FIR',
+    prompt: 'How do I file an FIR correctly if the police station is refusing to register it?',
   },
   {
     icon: Building,
-    title: 'Property Law',
-    prompt: 'What is the step-by-step process to verify land titles before purchase?',
+    title: 'Property Check',
+    prompt: 'What major documents should I verify before buying a flat in an under-construction project?',
   },
   {
-    icon: Shield,
-    title: 'Startup & IP',
-    prompt: 'Draft a Non-Disclosure Agreement (NDA) for my new employee.',
+    icon: FileText,
+    title: 'RTI Application',
+    prompt: 'Draft an RTI application to get the status of my pending government scheme benefits.',
+  },
+  {
+    icon: Users,
+    title: 'Family & Marriage',
+    prompt: 'What are the legal requirements for a mutual consent divorce and how long does it take?',
   },
 ];
 
