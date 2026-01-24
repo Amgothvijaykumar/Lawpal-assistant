@@ -50,6 +50,7 @@ interface ChatContainerProps {
   onRemoveHighlight?: (messageId: string, highlightId: string) => Promise<boolean>;
   chatType?: 'ai' | 'lawyer';
   consultationStatus?: 'request_sent' | 'accepted' | 'ongoing' | 'closed';
+  onOpenMiniCourt?: () => void;
 }
 
 import { Bot, Gavel } from 'lucide-react';
@@ -68,6 +69,7 @@ export function ChatContainer({
   onUpdateMessage,
   onAddHighlight,
   onRemoveHighlight,
+  onOpenMiniCourt,
 }: ChatContainerProps) {
   const { user } = useAuth();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -213,6 +215,7 @@ export function ChatContainer({
           disabled={loading || streaming}
           isStreaming={streaming}
           placeholder="Ask anything..."
+          onOpenMiniCourt={onOpenMiniCourt}
         />
       </div>
       <ConsultationRequestModal

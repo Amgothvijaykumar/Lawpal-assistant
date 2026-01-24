@@ -12,6 +12,7 @@ import { SettingsSheet } from '../settings/SettingsSheet';
 import { ProfileCompletionModal } from '../profile/ProfileCompletionModal';
 import { LawyerPanel } from './LawyerPanel';
 import { CaseSummaryPanel } from './CaseSummaryPanel';
+import { MiniCourt } from './MiniCourt';
 import { useChatSessions } from '@/hooks/useChatSessions';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,12 +29,12 @@ export function ChatLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showLawyerPanel, setShowLawyerPanel] = useState(false);
   const [showCaseSummary, setShowCaseSummary] = useState(true);
-
   // Persist viewMode in localStorage
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem('actright_viewMode');
     return (saved as ViewMode) || 'session';
   });
+  const [miniCourtOpen, setMiniCourtOpen] = useState(false);
 
   // Enhanced state for lawyer chat features
   const { user, refreshProfile } = useAuth();
@@ -185,6 +186,7 @@ export function ChatLayout() {
             onUpdateMessage={updateMessage}
             onAddHighlight={addHighlight}
             onRemoveHighlight={removeHighlight}
+            onOpenMiniCourt={() => setMiniCourtOpen(true)}
           />
         );
     }
@@ -280,6 +282,12 @@ export function ChatLayout() {
       <SettingsSheet
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+
+      {/* MiniCourt Modal */}
+      <MiniCourt
+        open={miniCourtOpen}
+        onOpenChange={setMiniCourtOpen}
       />
 
       {/* Font Preloader to prevent layout shifts */}
