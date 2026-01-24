@@ -47,6 +47,7 @@ interface ChatContainerProps {
   onUpdateMessage: (id: string, newContent: string) => Promise<void>;
   chatType?: 'ai' | 'lawyer';
   consultationStatus?: 'request_sent' | 'accepted' | 'ongoing' | 'closed';
+  onOpenMiniCourt?: () => void;
 }
 
 export function ChatContainer({
@@ -59,6 +60,7 @@ export function ChatContainer({
   sessionId,
   onShowLawyers,
   onUpdateMessage,
+  onOpenMiniCourt,
 }: ChatContainerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
@@ -194,6 +196,7 @@ export function ChatContainer({
         disabled={loading || streaming}
         isStreaming={streaming}
         placeholder="Ask anything..."
+        onOpenMiniCourt={onOpenMiniCourt}
       />
       </div>
     </div>

@@ -9,6 +9,7 @@ import { ProfileSheet } from '../profile/ProfileSheet';
 import { SettingsSheet } from '../settings/SettingsSheet';
 import { LawyerPanel } from './LawyerPanel';
 import { CaseSummaryPanel } from './CaseSummaryPanel';
+import { MiniCourt } from './MiniCourt';
 import { useChatSessions } from '@/hooks/useChatSessions';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ export function ChatLayout() {
   const [showLawyerPanel, setShowLawyerPanel] = useState(false);
   const [showCaseSummary, setShowCaseSummary] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('session');
+  const [miniCourtOpen, setMiniCourtOpen] = useState(false);
 
   // Enhanced state for lawyer chat features
   const [currentChatType, setCurrentChatType] = useState<ChatType>('ai');
@@ -100,6 +102,7 @@ export function ChatLayout() {
             consultationStatus={consultationStatus}
             onShowLawyers={() => setShowLawyerPanel(true)}
             onUpdateMessage={updateMessage}
+            onOpenMiniCourt={() => setMiniCourtOpen(true)}
           />
         );
     }
@@ -192,6 +195,12 @@ export function ChatLayout() {
       <SettingsSheet
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+
+      {/* MiniCourt Modal */}
+      <MiniCourt
+        open={miniCourtOpen}
+        onOpenChange={setMiniCourtOpen}
       />
 
       {/* Font Preloader to prevent layout shifts */}

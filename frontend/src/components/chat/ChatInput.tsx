@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Paperclip, StopCircle } from 'lucide-react';
+import { Send, Loader2, Paperclip, StopCircle, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface ChatInputProps {
   isStreaming?: boolean;
   onStopGenerating?: () => void;
   placeholder?: string;
+  onOpenMiniCourt?: () => void;
 }
 
 export function ChatInput({
@@ -22,7 +23,8 @@ export function ChatInput({
   disabled,
   isStreaming,
   onStopGenerating,
-  placeholder = "Ask a legal question..."
+  placeholder = "Ask a legal question...",
+  onOpenMiniCourt
 }: ChatInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -98,10 +100,28 @@ export function ChatInput({
               disabled={disabled}
             >
               <Paperclip className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Attach document</TooltipContent>
+        </Tooltip>
+
+        {/* MiniCourt Button */}
+        {onOpenMiniCourt && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onOpenMiniCourt}
+                className="h-10 w-10 rounded-full shrink-0 text-amber-600 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-900/30"
+                disabled={disabled}
+              >
+                <Scale className="w-4 h-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Attach document</TooltipContent>
+            <TooltipContent>Open Digital Courtroom</TooltipContent>
           </Tooltip>
+        )}
 
           <Textarea
             ref={textareaRef}

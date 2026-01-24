@@ -1057,6 +1057,81 @@ app.post('/api/maintenance/deduplicate', authenticateToken, checkDatabaseConnect
     }
 });
 
+// ==================== MINI COURT - TRIAL SIMULATION ====================
+app.post('/api/simulate-trial', async (req, res) => {
+    try {
+        const { description, evidence_files } = req.body;
+
+        if (!description || !description.trim()) {
+            return res.status(400).json({ error: 'Case description is required' });
+        }
+
+        console.log('🔨 Simulating trial for case:', description.substring(0, 100) + '...');
+
+        const GROQ_API_KEY = process.env.GROQ_API_KEY;
+        if (!GROQ_API_KEY) {
+            return res.status(500).json({ error: 'GROQ API key not configured' });
+        }
+
+        // Create the system prompt for trial simulation
+        const systemPrompt = `You are a legal AI system simulating a mini-trial. Your task is to:
+1. Act as the PETITIONER'S LAWYER (defense) - provide strong arguments in favor of the user
+2. Act as the RESPONDENT'S LAWYER (opposition) - provide counter-arguments and weaknesses
+3. Act as a JUDGE - provide a balanced verdict with win probability
+
+Analyze the case objectively and professionally. Be realistic but educational.`;
+
+        const userPrompt = `
+Case Description:
+${description}
+
+${evidence_files && evidence_files.length > 0 ? `Evidence Files: ${evidence_files.join(', ')}` : 'No evidence files attached.'}
+
+Please provide:
+1. **Petitioner's Argument**: Strong legal arguments supporting the user's case
+2. **Respondent's Argument**: Counter-arguments and weaknesses in the user's position
+3. **Judge's Verdict**: Balanced analysis with win probability (0-100%)
+4. **Critical Warning**: Any major risks or missing evidence
+
+Format your response as JSON with these exact keys:
+{
+  "petitioner_argument": "...",
+  "respondent_argument": "...",
+  "judge_verdict": "...",
+  "win_probability": 65,
+  "critical_warning": "..."
+}`;
+
+        // Call GROQ API
+        const response = await groqAxios.post('/chat/completions', {
+            model: process.env.GROQ_MODEL_NAME || 'llama-3.3-70b-versatile',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000,
+            response_format: { type: "json_object" }
+        }, {
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`
+            }
+        });
+
+        const result = JSON.parse(response.data.choices[0].message.content);
+        
+        console.log('✅ Trial simulation complete');
+        res.json(result);
+
+    } catch (error) {
+        console.error('❌ Trial simulation error:', error.response?.data || error.message);
+        res.status(500).json({ 
+            error: 'Failed to simulate trial',
+            details: error.response?.data?.error?.message || error.message 
+        });
+    }
+});
+
 // Socket.io for real-time (optional for now, but good for "structure")
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
