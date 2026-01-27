@@ -1,9 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-<<<<<<< HEAD
-import { Send, Loader2, Paperclip, StopCircle, Mic, MicOff, Check, Trash2 } from 'lucide-react';
-=======
-import { Send, Loader2, Paperclip, StopCircle, Scale } from 'lucide-react';
->>>>>>> Amar
+import { Send, Loader2, Paperclip, StopCircle, Mic, MicOff, Check, Trash2, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
@@ -62,10 +58,8 @@ export function ChatInput({
         };
 
         recognition.onerror = (event: any) => {
-          // 'network' error is common if silent for too long or signal drop
-          // 'aborted' happens if we stop manually - no need for error logs
           if (event.error !== 'aborted' && event.error !== 'no-speech') {
-            console.error("Speech recognition error:", event.error, event.message); // Added more logging
+            console.error("Speech recognition error:", event.error, event.message);
             if (event.error === 'network') {
               toast.error("Network sync issue. Try a shorter sentence.");
             } else if (event.error === 'not-allowed') {
@@ -87,8 +81,8 @@ export function ChatInput({
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort(); // Ensure recognition is stopped
-        recognitionRef.current = null; // Nullify ref on unmount
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
       }
     };
   }, []);
@@ -170,7 +164,6 @@ export function ChatInput({
               onClick={handleDiscardVoice}
               className="h-9 w-9 rounded-full text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
             >
-<<<<<<< HEAD
               <Trash2 className="w-4.5 h-4.5" />
             </Button>
             <Button
@@ -206,14 +199,39 @@ export function ChatInput({
           </div>
         )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 relative z-10"
-          disabled={disabled || isListening}
-        >
-          <Paperclip className="w-4.5 h-4.5" />
-        </Button>
+        {/* Tools Section (Paperclip & MiniCourt) */}
+        <div className="flex items-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 relative z-10"
+                disabled={disabled || isListening}
+              >
+                <Paperclip className="w-4.5 h-4.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Attach document</TooltipContent>
+          </Tooltip>
+
+          {onOpenMiniCourt && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onOpenMiniCourt}
+                  className="h-10 w-10 rounded-full shrink-0 text-amber-600 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-900/30 relative z-10"
+                  disabled={disabled || isListening}
+                >
+                  <Scale className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open Digital Courtroom</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
 
         <Textarea
           ref={textareaRef}
@@ -258,31 +276,7 @@ export function ChatInput({
               </Button>
             </TooltipTrigger>
             <TooltipContent>{isListening ? 'Stop recording' : 'Voice input'}</TooltipContent>
-=======
-              <Paperclip className="w-4 h-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Attach document</TooltipContent>
-        </Tooltip>
-
-        {/* MiniCourt Button */}
-        {onOpenMiniCourt && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onOpenMiniCourt}
-                className="h-10 w-10 rounded-full shrink-0 text-amber-600 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-100/50 dark:hover:bg-amber-900/30"
-                disabled={disabled}
-              >
-                <Scale className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Open Digital Courtroom</TooltipContent>
->>>>>>> Amar
           </Tooltip>
-        )}
 
           {isStreaming ? (
             <Button
@@ -314,7 +308,8 @@ export function ChatInput({
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes voice-wave {
           0%, 100% { transform: scaleY(1); opacity: 0.3; }
           50% { transform: scaleY(3.5); opacity: 0.9; }

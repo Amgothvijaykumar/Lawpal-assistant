@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, Scale, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChatSidebar } from './ChatSidebar';
 import { ChatContainer } from './ChatContainer';
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 
 type ChatType = 'ai' | 'lawyer';
 type ConsultationStatus = 'request_sent' | 'accepted' | 'ongoing' | 'closed';
-type ViewMode = 'chat' | 'enhanced-chat' | 'documents' | 'session' | 'lawyer-consultation';
+type ViewMode = 'chat' | 'enhanced-chat' | 'documents' | 'session' | 'lawyer-consultation' | 'mini-court';
 
 export function ChatLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,7 +34,6 @@ export function ChatLayout() {
     const saved = localStorage.getItem('actright_viewMode');
     return (saved as ViewMode) || 'session';
   });
-  const [miniCourtOpen, setMiniCourtOpen] = useState(false);
 
   // Enhanced state for lawyer chat features
   const { user, refreshProfile } = useAuth();
@@ -90,9 +89,6 @@ export function ChatLayout() {
     removeHighlight,
   } = useChatMessages(currentSessionId);
 
-  // DO NOT auto-select any session on page load
-  // User must explicitly click a session to load it
-
   const handleNewChat = async () => {
     await createSession();
   };
@@ -118,18 +114,15 @@ export function ChatLayout() {
     setCurrentSessionId(id);
     setViewMode('session');
 
-    // Determine chat type based on real session data
     const selectedSession = sessions.find(s => s.id === id);
     if (selectedSession) {
       setCurrentChatType(selectedSession.type);
     } else {
-      // Fallback or default
       setCurrentChatType('ai');
     }
   };
 
   const handleOpenChat = async () => {
-    // Start AI chat by default from sidebar "Start AI Chat" button
     setCurrentChatType('ai');
     if (!currentSessionId) {
       await createSession('New Chat', 'ai');
@@ -148,15 +141,15 @@ export function ChatLayout() {
   const renderMainContent = () => {
     switch (viewMode) {
       case 'lawyer-consultation':
-        // If lawyer, show Dashboard. If user, show Marketplace.
         if (user?.role === 'lawyer') {
           return <LawyerDashboard onOpenChat={handleSelectSession} onRefreshSessions={refreshSessions} />;
         }
         return <RecommendedLawyers onOpenChat={handleSelectSession} />;
       case 'documents':
         return <EnhancedDocumentView />;
+      case 'mini-court':
+        return <MiniCourt onClose={() => setViewMode('session')} />;
       case 'session':
-        // If current session is lawyer type, render LawyerChatContainer
         if (currentChatType === 'lawyer') {
           const session = sessions.find(s => s.id === currentSessionId);
           return (
@@ -170,7 +163,6 @@ export function ChatLayout() {
             />
           );
         }
-        // Else render AI ChatContainer
         return (
           <ChatContainer
             messages={messages}
@@ -186,15 +178,16 @@ export function ChatLayout() {
             onUpdateMessage={updateMessage}
             onAddHighlight={addHighlight}
             onRemoveHighlight={removeHighlight}
-            onOpenMiniCourt={() => setMiniCourtOpen(true)}
+            onOpenMiniCourt={() => setViewMode('mini-court')}
           />
         );
+      default:
+        return <EmptyMainContent />;
     }
   };
 
   return (
     <div className="h-screen flex bg-[#F9FAFB] dark:bg-slate-900 overflow-hidden">
-      {/* Mobile Sidebar Toggle */}
       <Button
         variant="ghost"
         size="icon"
@@ -207,7 +200,6 @@ export function ChatLayout() {
         <Menu className="w-4 h-4" />
       </Button>
 
-      {/* Sidebar - Positioned absolutely on mobile, relative on desktop */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-40 bg-[#F9FAFB] dark:bg-slate-900 border-r border-slate-200/50 dark:border-slate-700',
@@ -236,7 +228,6 @@ export function ChatLayout() {
         />
       </aside>
 
-      {/* Overlay for mobile */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/20 z-30 lg:hidden backdrop-blur-[2px]"
@@ -244,15 +235,12 @@ export function ChatLayout() {
         />
       )}
 
-      {/* Main Chat Area - FIXED width, always centered, NOT affected by sidebar */}
       <main className="flex-1 flex justify-center min-w-0">
         <div className="w-full max-w-4xl flex flex-col">
           {renderMainContent()}
         </div>
       </main>
 
-
-      {/* Case Summary Panel */}
       {showCaseSummary && currentSessionId && currentChatType === 'lawyer' && (
         <div className="w-96 border-l border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
           <CaseSummaryPanel
@@ -262,7 +250,6 @@ export function ChatLayout() {
         </div>
       )}
 
-      {/* Lawyer Panel - Right Sidebar */}
       {showLawyerPanel && (
         <div className="w-96 border-l border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl shrink-0 transition-all duration-300">
           <LawyerPanel
@@ -272,25 +259,16 @@ export function ChatLayout() {
         </div>
       )}
 
-      {/* Profile Sheet */}
       <ProfileSheet
         open={profileOpen}
         onOpenChange={setProfileOpen}
       />
 
-      {/* Settings Sheet */}
       <SettingsSheet
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
       />
 
-      {/* MiniCourt Modal */}
-      <MiniCourt
-        open={miniCourtOpen}
-        onOpenChange={setMiniCourtOpen}
-      />
-
-      {/* Font Preloader to prevent layout shifts */}
       <div className="preload-fonts absolute pointer-events-none opacity-0 select-none -z-50">
         Preload .
       </div>
@@ -299,6 +277,14 @@ export function ChatLayout() {
         isOpen={showCompletionModal}
         onComplete={handleProfileComplete}
       />
+    </div>
+  );
+}
+
+function EmptyMainContent() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <p className="text-slate-400">Select a session to start</p>
     </div>
   );
 }

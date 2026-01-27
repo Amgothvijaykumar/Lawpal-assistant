@@ -56,15 +56,15 @@ export function LawyerPanel({ isOpen, onClose }: LawyerPanelProps) {
       const fetchLawyers = async () => {
         try {
           console.log('🔍 Fetching recommended lawyers from database...');
-          
+
           const res = await axios.post(`${API_URL}/lawyers/ranked`, {}, {
             headers: { Authorization: `Bearer ${token}` },
             timeout: 10000 // 10 second timeout
           });
 
           // Handle response - could be array or object with best/all
-          let baseLawyers = Array.isArray(res.data) 
-            ? res.data 
+          let baseLawyers = Array.isArray(res.data)
+            ? res.data
             : (res.data.best || res.data.all || []);
 
           console.log(`📊 Received ${baseLawyers.length} lawyers from database`);
@@ -82,7 +82,7 @@ export function LawyerPanel({ isOpen, onClose }: LawyerPanelProps) {
             _id: l._id || `lawyer_${idx}`,
             fullName: l.fullName || `Advocate ${idx + 1}`,
             primaryPracticeArea: l.primaryPracticeArea || 'General Practice',
-            rating: l.rating || l.ratingScore || 4.5,
+            rating: (l.rating && typeof l.rating === 'object') ? (l.rating.averageRating || 4.5) : (Number(l.rating) || l.ratingScore || 4.5),
             distanceValue: l.distanceValue || parseFloat(l.distance) || (2 + idx * 1.5),
             distance: l.distance || `${(2 + idx * 1.5).toFixed(1)} km`,
             activeStatus: l.activeStatus ?? l.available ?? true,

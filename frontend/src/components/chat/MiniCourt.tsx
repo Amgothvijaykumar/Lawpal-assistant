@@ -1,18 +1,12 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Scale,
   Shield,
@@ -23,12 +17,22 @@ import {
   AlertTriangle,
   FileText,
   X,
+  ChevronLeft,
+  Sparkles,
+  History,
+  Info,
+  CheckCircle2,
+  LayoutList,
+  Target,
+  FileBadge
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+
+const API_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface MiniCourtProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
 }
 
 interface TrialResult {
@@ -39,7 +43,8 @@ interface TrialResult {
   critical_warning: string;
 }
 
-export function MiniCourt({ open, onOpenChange }: MiniCourtProps) {
+export function MiniCourt({ onClose }: MiniCourtProps) {
+  const { token } = useAuth();
   const [caseDescription, setCaseDescription] = useState('');
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,9 +55,11 @@ export function MiniCourt({ open, onOpenChange }: MiniCourtProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadingMessages = [
+    "Analyzing historical precedents...",
     "Reviewing submitted evidence...",
-    "Opposition is preparing arguments...",
-    "Judge is writing the verdict...",
+    "Opposition counsel is preparing arguments...",
+    "Deliberating case merits...",
+    "AI Judge is drafting the final verdict...",
   ];
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,26 +79,22 @@ export function MiniCourt({ open, onOpenChange }: MiniCourtProps) {
     setIsLoading(true);
     setTrialResult(null);
     setError(null);
-    
-    // Create abort controller
+
     abortControllerRef.current = new AbortController();
 
-    // Rotate loading messages
     let messageIndex = 0;
     setLoadingText(loadingMessages[0]);
     const loadingInterval = setInterval(() => {
       messageIndex = (messageIndex + 1) % loadingMessages.length;
       setLoadingText(loadingMessages[messageIndex]);
-    }, 2000);
+    }, 3000);
 
     try {
-      console.log('🔨 Starting trial simulation...');
-      
-      // ✅ FIX: Corrected URL to match your Python Backend (Port 7860)
-      const response = await fetch('http://127.0.0.1:7860/simulate_trial', {
+      const response = await fetch(`${API_URL}/simulate-trial`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           description: caseDescription,
@@ -100,31 +103,18 @@ export function MiniCourt({ open, onOpenChange }: MiniCourtProps) {
         signal: abortControllerRef.current.signal,
       });
 
-      console.log('Response Status:', response.status);
-
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', errorText);
-        throw new Error(`Trial simulation failed: ${response.status} ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({ error: 'Unknown server error' }));
+        throw new Error(errorData.error || `Trial simulation failed: ${response.status}`);
       }
 
       const data = await response.json();
-      console.log('✅ Trial result received:', data);
-      
-      // Validate response has required fields
-      if (!data.petitioner_argument || !data.respondent_argument || !data.judge_verdict) {
-        throw new Error('Invalid response format from server');
-      }
-
       setTrialResult(data);
-      setError(null);
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        console.log('Trial simulation aborted by user');
-        setError('Trial simulation was stopped');
+        setError('Proceedings adjourned');
       } else {
-        console.error('❌ Error simulating trial:', error);
-        setError('Failed to connect to the AI Judge. Ensure backend is running on port 7860.');
+        setError('Connection failed. Please check your backend.');
       }
     } finally {
       clearInterval(loadingInterval);
@@ -136,7 +126,6 @@ export function MiniCourt({ open, onOpenChange }: MiniCourtProps) {
   const handleStopProceedings = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-      setIsLoading(false);
     }
   };
 
@@ -148,270 +137,234 @@ export function MiniCourt({ open, onOpenChange }: MiniCourtProps) {
     setError(null);
   };
 
+  // Helper to "bulletize" text for clearer representation
+  const getPowerPoints = (text: any) => {
+    if (!text) return [];
+    if (Array.isArray(text)) return text.map(t => typeof t === 'string' ? t.trim() : JSON.stringify(t)).filter(t => t.length > 5);
+    if (typeof text === 'string') {
+      return text.split(/\.|\n/).filter(line => line.trim().length > 10).map(line => line.trim());
+    }
+    return [String(text)];
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] p-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
-            <Scale className="w-7 h-7 text-amber-600" />
-            ⚖️ The Digital Courtroom
-          </DialogTitle>
-          <DialogDescription className="text-base mt-2">
-            Simulate your case instantly. See how the opposition will attack you.
-          </DialogDescription>
-        </DialogHeader>
+    <div className="flex-1 flex flex-col h-full bg-white dark:bg-slate-950 font-sans">
+      {/* minimalist Header */}
+      <header className="shrink-0 px-8 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between z-20">
+        <div className="flex items-center gap-6">
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <div className="space-y-0.5">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Scale className="w-5 h-5 text-indigo-600" />
+              Trial Insights
+            </h1>
+            <p className="text-[11px] font-medium text-slate-400 uppercase tracking-widest">Case Simulation Engine</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {trialResult && (
+            <Button variant="outline" size="sm" onClick={handleReset} className="rounded-full h-9 text-xs font-semibold px-4 border-slate-200">
+              <History className="w-3.5 h-3.5 mr-2" />
+              Reset Case
+            </Button>
+          )}
+          <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-none px-4 py-1.5 rounded-full text-[10px] font-bold tracking-wider">
+            AI JUDGE 1.0
+          </Badge>
+        </div>
+      </header>
 
-        <ScrollArea className="max-h-[calc(90vh-120px)]">
-          <div className="p-6 space-y-6">
+      <ScrollArea className="flex-1">
+        <div className="max-w-4xl mx-auto p-8 lg:p-12 mb-20">
+          <AnimatePresence mode="wait">
             {!trialResult && !isLoading && (
-              <>
-                {/* Input Zone */}
+              <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">
-                      Case Description
-                    </label>
-                    <Textarea
-                      value={caseDescription}
-                      onChange={(e) => setCaseDescription(e.target.value)}
-                      placeholder="Describe your legal issue in detail... (e.g., I lent 5 Lakhs cash to a friend without a contract, and now he won't pay me back.)"
-                      className="min-h-[150px] resize-none"
-                      disabled={isLoading}
-                    />
-                  </div>
+                  <h2 className="text-4xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight leading-tight">
+                    Strategic <span className="text-indigo-600">Representation.</span><br />
+                    Clear Evidence.
+                  </h2>
+                  <p className="text-lg text-slate-500 font-medium max-w-2xl">
+                    Input your case details below to generate a clear, point-by-point legal summary and outcome prediction.
+                  </p>
+                </div>
 
-                  {/* Evidence Upload */}
-                  <div>
-                    <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-                      <FileText className="w-4 h-4" />
-                      📎 Attach Evidence (Optional)
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full"
-                      disabled={isLoading}
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      Upload Files (Images, PDFs)
-                    </Button>
-
-                    {/* File Badges */}
-                    {evidenceFiles.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {evidenceFiles.map((file, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="pl-3 pr-1 py-1.5 gap-2"
-                          >
-                            <FileText className="w-3 h-3" />
-                            {file.name}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4 p-0 hover:bg-transparent"
-                              onClick={() => removeFile(index)}
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </Badge>
-                        ))}
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-12">
+                  <div className="lg:col-span-3 space-y-4">
+                    <label className="text-xs font-bold uppercase text-slate-400 tracking-widest">Case Description</label>
+                    <div className="relative group">
+                      <Textarea
+                        value={caseDescription}
+                        onChange={(e) => setCaseDescription(e.target.value)}
+                        placeholder="Describe the incident, dates, and key parties involved..."
+                        className="min-h-[300px] border-slate-200 dark:border-slate-800 rounded-2xl p-6 text-base shadow-sm focus:shadow-md transition-all resize-none leading-relaxed"
+                      />
+                      <div className="absolute bottom-4 right-4 text-[10px] text-slate-400 font-bold bg-white/80 px-2 py-1 rounded-md backdrop-blur-sm">
+                        {caseDescription.length} characters
                       </div>
-                    )}
+                    </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-3 pt-2">
+                  <div className="lg:col-span-2 space-y-8">
+                    <div className="space-y-4">
+                      <label className="text-xs font-bold uppercase text-slate-400 tracking-widest">Evidence Files</label>
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-8 text-center hover:bg-slate-50 transition-all cursor-pointer flex flex-col items-center gap-3"
+                      >
+                        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileSelect} />
+                        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                          <Upload className="w-5 h-5 text-slate-500" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Attach Documentation</span>
+                      </div>
+
+                      {evidenceFiles.length > 0 && (
+                        <div className="space-y-2">
+                          {evidenceFiles.map((file, i) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl text-xs font-semibold">
+                              <span className="truncate max-w-[150px]">{file.name}</span>
+                              <X className="w-4 h-4 cursor-pointer text-slate-400 hover:text-red-500" onClick={() => removeFile(i)} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <Button
                       onClick={handleConveneCourt}
                       disabled={!caseDescription.trim() || isLoading}
-                      className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-6 text-lg"
+                      className="w-full h-16 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-base shadow-xl transition-all"
                     >
-                      <Gavel className="w-5 h-5 mr-2" />
-                      🔨 Convene Court
+                      <Gavel className="w-5 h-5 mr-3" />
+                      Generate Analysis
                     </Button>
                   </div>
-
-                  {/* Show error if exists */}
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>
-                        {error}
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
-              </>
+              </motion.div>
             )}
 
-            {/* Error State */}
-            {error && !isLoading && (
-              <Alert variant="destructive" className="my-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Error:</strong> {error}
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Loading State */}
             {isLoading && (
-              <div className="flex flex-col items-center justify-center py-16 space-y-6">
+              <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-40 space-y-8">
                 <div className="relative">
-                  <Gavel className="w-16 h-16 text-amber-600 animate-pulse" />
+                  <Gavel className="w-16 h-16 text-indigo-600 animate-bounce" />
+                  <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 w-8 h-1 bg-slate-100 rounded-full blur-[2px] animate-pulse" />
                 </div>
-                <div className="text-center space-y-2">
-                  <h3 className="text-xl font-semibold">Trial in Progress</h3>
-                  <p className="text-muted-foreground animate-pulse">
-                    {loadingText}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    This may take 10-30 seconds...
-                  </p>
-                </div>
-                <Button
-                  onClick={handleStopProceedings}
-                  variant="destructive"
-                  className="mt-4"
-                >
-                  <StopCircle className="w-4 h-4 mr-2" />
-                  🛑 Stop Proceedings
-                </Button>
-              </div>
-            )}
-
-            {/* Result Display - The Courtroom View */}
-            {trialResult && (
-              <div className="space-y-6">
-                <div className="text-center">
-                  <Badge variant="secondary" className="mb-4 text-lg px-4 py-2">
-                    ⚖️ Trial Complete
-                  </Badge>
-                </div>
-
-                {/* 3-Card Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Card 1: Petitioner (Defense) */}
-                  <Card className="border-2 border-green-200 bg-green-50/50 dark:bg-green-950/20 dark:border-green-800">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                        <Shield className="w-5 h-5" />
-                        🛡️ Your Defense Counsel
-                      </CardTitle>
-                      <CardDescription className="text-green-600 dark:text-green-500">
-                        Arguments in your favor
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ScrollArea className="max-h-64">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {trialResult.petitioner_argument}
-                        </p>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-
-                  {/* Card 2: Opposition */}
-                  <Card className="border-2 border-red-200 bg-red-50/50 dark:bg-red-950/20 dark:border-red-800">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
-                        <Swords className="w-5 h-5" />
-                        ⚔️ Respondent's Argument
-                      </CardTitle>
-                      <CardDescription className="text-red-600 dark:text-red-500">
-                        Opposition's counter-attack
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ScrollArea className="max-h-64">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {trialResult.respondent_argument}
-                        </p>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Card 3: The Verdict (Center/Highlighted) */}
-                <Card className="border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 dark:border-amber-700">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xl">
-                      <Scale className="w-6 h-6" />
-                      ⚖️ Preliminary Judgment
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Win Probability Meter */}
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Win Probability</span>
-                        <span className="text-2xl font-bold text-amber-700 dark:text-amber-400">
-                          {trialResult.win_probability}%
-                        </span>
-                      </div>
-                      <Progress 
-                        value={trialResult.win_probability} 
-                        className="h-3"
-                      />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Weak Case</span>
-                        <span>Strong Case</span>
-                      </div>
-                    </div>
-
-                    {/* Verdict Text */}
-                    <div className="pt-2">
-                      <h4 className="font-semibold mb-2 text-sm">Judge's Analysis:</h4>
-                      <ScrollArea className="max-h-48">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                          {trialResult.judge_verdict}
-                        </p>
-                      </ScrollArea>
-                    </div>
-
-                    {/* Critical Warning */}
-                    {trialResult.critical_warning && (
-                      <Alert variant="destructive" className="mt-4">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertDescription className="text-sm">
-                          <strong>Critical Warning:</strong> {trialResult.critical_warning}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Action Buttons */}
-                <div className="flex justify-center gap-3 pt-2">
-                  <Button onClick={handleReset} variant="outline" size="lg">
-                    <Gavel className="w-4 h-4 mr-2" />
-                    Start New Trial
+                <div className="text-center space-y-4">
+                  <h3 className="text-2xl font-bold tracking-tight">{loadingText}</h3>
+                  <p className="text-sm text-slate-400 font-medium max-w-xs mx-auto">Cross-referencing legal documents and predicting court behavior...</p>
+                  <Button variant="ghost" className="text-red-500 font-bold text-xs uppercase tracking-widest" onClick={handleStopProceedings}>
+                    Stop Simulation
                   </Button>
                 </div>
-
-                {/* Disclaimer Footer */}
-                <div className="pt-4 border-t">
-                  <p className="text-xs text-center text-muted-foreground leading-relaxed">
-                    <strong>DISCLAIMER:</strong> This is an AI simulation for educational strategy only. 
-                    It is not a substitute for real legal advice. Please consult a human advocate for official proceedings.
-                  </p>
-                </div>
-              </div>
+              </motion.div>
             )}
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+
+            {trialResult && (
+              <motion.div key="result" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
+                {/* 1. Verdict Executive Summary */}
+                <div className="bg-slate-50 dark:bg-slate-900 rounded-[32px] p-10 flex flex-col md:flex-row items-center gap-12 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <Scale className="w-48 h-48" />
+                  </div>
+
+                  <div className="w-full md:w-64 flex flex-col items-center text-center space-y-4 border-b md:border-b-0 md:border-r border-slate-200 dark:border-slate-800 pb-8 md:pb-0 md:pr-12">
+                    <div className="text-xs font-black text-indigo-600 uppercase tracking-widest">Probability of Success</div>
+                    <div className="text-7xl font-extrabold tracking-tighter text-slate-900 dark:text-slate-100">{trialResult.win_probability}%</div>
+                    <div className="w-full space-y-1.5">
+                      <Progress value={trialResult.win_probability} className="h-2 rounded-full" />
+                      <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span>Low Merit</span>
+                        <span>High Merit</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="w-5 h-5 text-indigo-600" />
+                      <h3 className="text-lg font-bold uppercase tracking-tight">Judicial Determination</h3>
+                    </div>
+                    <p className="text-xl font-medium leading-relaxed text-slate-700 dark:text-slate-300">
+                      {trialResult.judge_verdict}
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Strategic Power Points (Representation Section) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  {/* Your Strength Points */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 px-2">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 flex items-center justify-center">
+                        <Target className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <h4 className="font-extrabold text-sm uppercase tracking-widest text-emerald-700">Strategic Power Points</h4>
+                    </div>
+                    <div className="space-y-4">
+                      {getPowerPoints(trialResult.petitioner_argument).map((point, i) => (
+                        <div key={i} className="flex gap-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-hover hover:border-emerald-200">
+                          <div className="shrink-0 w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-[10px] font-black text-emerald-600">0{i + 1}</div>
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-relaxed">{point}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Opposition Risk Points */}
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 px-2">
+                      <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/20 flex items-center justify-center">
+                        <Swords className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <h4 className="font-extrabold text-sm uppercase tracking-widest text-amber-700">Oppositional Risks</h4>
+                    </div>
+                    <div className="space-y-4">
+                      {getPowerPoints(trialResult.respondent_argument).map((point, i) => (
+                        <div key={i} className="flex gap-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-hover hover:border-amber-200">
+                          <div className="shrink-0 w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-[10px] font-black text-amber-600">0{i + 1}</div>
+                          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 leading-relaxed italic">{point}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Critical Liability (Clear Representation) */}
+                {trialResult.critical_warning && (
+                  <Alert className="rounded-3xl border-rose-100 bg-rose-50/30 dark:bg-rose-950/20 p-8">
+                    <div className="flex gap-6">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-500 flex items-center justify-center shrink-0 shadow-lg shadow-rose-200">
+                        <AlertTriangle className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-black uppercase tracking-widest text-rose-600">High-Risk Liability Detected</h4>
+                        <p className="text-base text-rose-900 dark:text-rose-200 leading-relaxed font-bold">
+                          {trialResult.critical_warning}
+                        </p>
+                      </div>
+                    </div>
+                  </Alert>
+                )}
+
+                {/* 4. Action Steps / Next Representation */}
+                <div className="pt-10 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-3">
+                    <FileBadge className="w-5 h-5 text-slate-400" />
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Authorized Simulation Result</span>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="rounded-full px-8 h-12 text-xs font-bold border-slate-200">Report Export</Button>
+                    <Button onClick={handleReset} className="rounded-full px-8 h-12 text-xs font-bold bg-indigo-600">New Simulation</Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
