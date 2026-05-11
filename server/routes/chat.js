@@ -213,53 +213,33 @@ module.exports = (authenticateToken, checkDatabaseConnection, io, groqAxios) => 
                     console.log(`📦 Payload:`, JSON.stringify(payload, null, 2));
                     console.log(`----------------------------------------------------------------`);
 
-                    const flaskResponse = await axios.post(`${FLASK_URL}/ask`, payload, { timeout: 5000 });
+                    const flaskResponse = await axios.post(`${FLASK_URL}/ask`, payload, { timeout: 15000 }); // Increased timeout
 
                     console.log(`----------------------------------------------------------------`);
                     console.log(`✅ RECEIVED FROM FLASK MODEL`);
                     console.log(`📦 Response Data:`, JSON.stringify(flaskResponse.data, null, 2));
                     console.log(`----------------------------------------------------------------`);
 
-                    fullResponse = flaskResponse.data.answer || "No response.";
+                    fullResponse = flaskResponse.data.answer || "No response details provided.";
                     fullResponse = fullResponse.replace(/Note: Some cited items may be unrelated[\s\S]*?ignored\./gi, '').trim();
+
                 } catch (flaskErr) {
                     console.error('⚠️ Local AI Unreachable:', flaskErr.message);
                     console.log(`❌ Failed Payload was:`, JSON.stringify({ query: message.trim() }));
-                    usedFallback = true;
-                }
-            } else {
-                usedFallback = true;
-            }
 
-            // 2. Fallback to Groq (Cloud LLM)
-            if (usedFallback) {
-                console.log('☁️ Switching to Groq Cloud Fallback...');
-                const groqKey = process.env.GROQ_API_KEY;
-                if (!groqKey) console.warn("⚠️ Warning: GROQ_API_KEY is missing in .env");
-
-                try {
-                    const groqResponse = await groqAxios.post('/chat/completions', {
-                        model: process.env.GROQ_MODEL_NAME || 'llama-3.3-70b-versatile',
-                        messages: [
-                            { role: "system", content: "You are a helpful Indian legal assistant named LawPal. Provide accurate, helpful legal information based on Indian law. Keep answers concise." },
-                            { role: "user", content: message.trim() }
-                        ],
-                        temperature: 0.7
-                    }, {
-                        headers: {
-                            'Authorization': `Bearer ${groqKey}`,
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    console.log('✅ Groq Fallback Response Received');
-                    fullResponse = groqResponse.data.choices[0]?.message?.content || "I apologize, but I couldn't generate a response at this time.";
-                } catch (groqErr) {
-                    console.error('❌ Groq Fallback Failed:', groqErr.response?.data || groqErr.message);
-                    res.write(`data: ${JSON.stringify({ done: true, error: 'AI service unavailable. Please check backend connections.' })}\n\n`);
+                    // Return error directly instead of fallback
+                    res.write(`data: ${JSON.stringify({ done: true, error: 'AI server unreachable. Please check backend connection.' })}\n\n`);
                     return res.end();
                 }
+            } else {
+                console.error('❌ FLASK_BACKEND_URL is not configured');
+                res.write(`data: ${JSON.stringify({ done: true, error: 'Server configuration error: FLASK_BACKEND_URL missing.' })}\n\n`);
+                return res.end();
             }
+
+            // Fallback logic REMOVED as per user request
+            // usedFallback variable is no longer needed
+
 
             res.write(`data: ${JSON.stringify({ content: fullResponse, done: false })}\n\n`);
 

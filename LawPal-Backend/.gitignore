@@ -1,98 +1,40 @@
-# ===================
 # Python
-# ===================
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.pickle
 
-# ===================
-# Virtual Environment
-# ===================
+# Virtual environment
 venv/
-env/
-ENV/
-.venv/
-
-# ===================
-# Environment Variables
-# ===================
+venv311/
 .env
-.env.local
-.env.*.local
 
-# ===================
-# IDE / Editor
-# ===================
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.project
-.pydevproject
-.settings/
-
-# ===================
-# OS Files
-# ===================
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
 
-# ===================
-# Logs
-# ===================
+# Cache and logs
 *.log
-logs/
-npm-debug.log*
+*.cache/
 
-# ===================
-# Testing
-# ===================
-.coverage
-.pytest_cache/
-htmlcov/
-.tox/
+# Large model or data files
+*.onnx
+*.bin
+*.pt
+*.h5
+models/
 
-# ===================
-# State Files
-# ===================
+# Database files
+chroma_db/
+*.sqlite3
+*.db
+
+# Large data/index files
+processed_legal_data.json
+chunk_ids.json
+bm25_corpus.pkl
+bm25_index.pkl
+
+# API key tracking
 api_key_tracker.json
-
-# ===================
-# Large Data/Model Files (keep in repo for deployment)
-# Uncomment if you want to exclude these
-# ===================
-# *.pkl
-# chroma_db/
-# processed_legal_data.json
-# bm25_index.pkl
-# chunk_ids.json
-
-# ===================
-# Backup Files
-# ===================
-*_old*.py
-*.bak
-*.backup

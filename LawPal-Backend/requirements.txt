@@ -2,10 +2,10 @@ flask
 python-dotenv
 gunicorn
 sentence-transformers
-chromadb
+chromadb==0.5.11
 rank_bm25
 groq
 tiktoken
 numpy
-torch
-flask-cors
+huggingface-hub==0.36.0
+redis>=5.0.0

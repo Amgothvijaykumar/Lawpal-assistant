@@ -7,13 +7,14 @@ import pickle
 import numpy as np
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from groq import Groq, RateLimitError
 import tiktoken
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.util import cos_sim
 import chromadb
 from rank_bm25 import BM25Okapi
-
+import courtroom  # Import the new courtroom module
 try:
     from redis_chat_memory import RedisChatMemory
 except Exception:
@@ -152,17 +153,32 @@ def count_tokens(text):
 
 
 def build_polished_prompt(query, reranked_chunks, token_budget, conversation_context: str = ""):
-    system_prompt = (
-        "You are LawPal AI, a professional and authoritative Indian Legal Assistant. "
-        "Your responses MUST be premium, structured, and easy to read. Follow these rules strictly:\n"
-        "1) STRUCTURE: Always start with a 1-2 line intro. Break the body into clear sections with descriptive headings (e.g., ### Key Provisions, ### Legal Implications).\n"
-        "2) READABILITY: Use short paragraphs (2-3 sentences max). Use bullet points for lists or multi-part explanations.\n"
-        "3) STYLE: Highlight key legal terms, sections, and acts using **bold text**. Avoid long, unstructured walls of text.\n"
-        "4) FIDELITY: Answer strictly based on the provided legal sources. Do not invent sections. If facts are ambiguous, ask 1-2 targeted clarifying questions.\n"
-        "5) INSUFFICIENCY: If sources are insufficient, state: \"The available legal documents do not contain sufficient information to answer this question.\"\n"
-        "6) CONCLUSION: Provide a brief summary or next steps at the end if applicable.\n"
-        "7) EMOJIS: MANDATORY. Integrate meaningful emojis generously throughout the response. Use them in headers, bullet points, and to emphasize key takeaways (e.g., ⚖️, 📜, 🚨, ✅). Make the response visually alive.\n"
-    )
+    system_prompt = """
+    **SYSTEM PROMPT – AI LAWYER CHAT (Frontend Version)**
+    You are a professional Indian Legal AI Assistant. Answer the user's legal questions strictly based on the provided sources (Acts, Rules, or Case Law excerpts).
+    ### Guidelines:
+    1. **Source-Based Responses**
+       - Use only the information from the provided sources.
+       - Do not invent or assume facts.
+       - If insufficient information is available, respond:
+         "The available legal documents do not contain sufficient information to answer this question."
+    2. **Legal Reasoning**
+       - Identify relevant Sections or Clauses and explain why they apply.
+       - Integrate multiple sources smoothly if necessary.
+    3. **Citation Style**
+       - Cite naturally: “Under Section 13B of the Hindu Marriage Act, 1955…”
+       - Avoid numeric tags like [Source 1] or URLs.
+    4. **Tone & Style**
+       - Professional, clear, and readable.
+       - Avoid long academic lists or repetitive wording.
+       - Keep answers concise for chat display, but legally precise.
+    5. **Confidence**
+       - Optionally, include a confidence rating at the end:
+         *Confidence: X/10 — based on the completeness of the provided legal sources.*
+    6. **Applicability**
+       - This prompt works for any Indian legal dataset.
+    Remember: You are a legal reasoning assistant, not a general explainer.
+    """
     convo_block = f"Conversation so far (oldest → newest):\n{conversation_context}\n\n" if conversation_context else ""
     header = f"{system_prompt}\n---\n{convo_block}"
 
@@ -193,14 +209,17 @@ def build_polished_prompt(query, reranked_chunks, token_budget, conversation_con
 
 # --- FLASK SERVER LOGIC ---
 app = Flask(__name__)
+# <--- ADD THESE LINES BELOW --->
+# Allow connection from your frontend (localhost:8080)
+CORS(app, resources={r"/*": {"origins": "*"}}) 
+# <--- END OF ADDITION --->
 
 # Clarifier prompt for thin evidence cases
 def build_clarifier_prompt(user_query: str, conversation_context: str = "") -> str:
     guidance = (
-        "The provided legal sources are insufficient to provide a definitive answer. "
-        "Your task is to ask 1–2 short, targeted clarifying questions to collect missing facts. "
-        "Keep the response structured: a brief intro explaining why more info is needed, followed by the questions in a clear list, and a polite closing. "
-        "Maintain a professional and helpful tone. MANDATORY: Use frequent and meaningful emojis to make the interaction friendly and engaging (e.g., 🤔, 📝, 💡)."
+        "The provided legal sources seem insufficient or only loosely related to answer directly. "
+        "Ask 1–2 short, targeted clarifying questions to collect the key missing facts so you can answer precisely next. "
+        "Stay strictly on-topic with the user's matter and keep questions concise."
     )
     convo = f"Conversation so far (oldest → newest):\n{conversation_context}\n\n" if conversation_context else ""
     return f"{guidance}\n---\n{convo}User's latest message:\n{user_query}"
@@ -287,12 +306,11 @@ except Exception as e:
 
 
 @app.route("/", methods=["GET"])
-@app.route("/health", methods=["GET"])
 def home():
-    return jsonify({"message": "AI Legal Backend is running!", "status": "online"})
+    return jsonify({"message": "AI Legal Backend is running!"})
 
 
-@app.route("/query", methods=["POST"])
+@app.route("/ask", methods=["POST"])
 def process_query():
     """API endpoint to run the full RAG pipeline."""
     try:
@@ -359,8 +377,8 @@ def process_query():
                     model="llama-3.3-70b-versatile",
                 )
                 final_answer = chat_completion.choices[0].message.content
-                # Guardrail review REMOVED as per user request
-                # final_answer, flagged = guardrail_review(final_answer, final_reranked_chunks)
+                # Guardrail review before finalizing
+                final_answer, flagged = guardrail_review(final_answer, final_reranked_chunks)
                 print("✅ Answer generated successfully.")
                 save_key_index((current_index + 1) % num_keys)
                 break
@@ -407,6 +425,25 @@ def get_history():
         return jsonify({"messages": messages})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+@app.route('/simulate_trial', methods=['POST'])
+def trial_route():
+    data = request.json
+    case_desc = data.get('description')
+    if not case_desc: return jsonify({"error": "No description provided"}), 400
+    
+    # FIX: Load the index from the file, just like in the /ask route
+    start_index = load_key_index()
+    
+    # Pass the keys and the loaded index to the new module
+    result = courtroom.simulate_trial_logic(case_desc, GROQ_API_KEYS, start_index)
+    
+    return jsonify(result)
+
+
+
 
 
 if __name__ == "__main__":
