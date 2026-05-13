@@ -213,7 +213,7 @@ module.exports = (authenticateToken, checkDatabaseConnection, io, groqAxios) => 
                     console.log(`📦 Payload:`, JSON.stringify(payload, null, 2));
                     console.log(`----------------------------------------------------------------`);
 
-                    const flaskResponse = await axios.post(`${FLASK_URL}/ask`, payload, { timeout: 15000 }); // Increased timeout
+                    const flaskResponse = await axios.post(`${FLASK_URL}/ask`, payload, { timeout: 120000 }); // Increased timeout for Hugging Face AI backend
 
                     console.log(`----------------------------------------------------------------`);
                     console.log(`✅ RECEIVED FROM FLASK MODEL`);
